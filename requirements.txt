@@ -1,0 +1,24 @@
+# AI Client Framework - Requirements
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+python-dotenv>=1.0.0
+
+# OpenAI support
+openai>=1.0.0
+tiktoken>=0.5.0
+
+# Gemini support
+google-generativeai>=0.3.0
+
+# Anthropic support (optional)
+anthropic>=0.7.0
+
+# Optional: For testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+pydantic>=2.5.2
+
+langgraph
+langchain-core
