@@ -6,6 +6,8 @@ from typing import Optional, List
 from base_client import BaseAIClient
 from openai_client import OpenAIClient
 from gemini_client import GeminiClient
+from openai_client_smith import OpenAIClientSmith
+from gemini_client_smith import GeminiClientSmith
 
 
 class ClientFactory:
@@ -17,11 +19,18 @@ class ClientFactory:
         'gemini': GeminiClient,
     }
     
+    # Registry of LangSmith-enabled clients
+    _clients_smith = {
+        'openai': OpenAIClientSmith,
+        'gemini': GeminiClientSmith,
+    }
+    
     @classmethod
     def create_client(
         cls, 
         provider: str, 
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        langsmith: bool = False
     ) -> BaseAIClient:
         """
         Create an AI client for the specified provider
@@ -29,6 +38,7 @@ class ClientFactory:
         Args:
             provider: Name of the provider ('openai', 'gemini', etc.)
             api_key: Optional API key. If not provided, will use environment variable
+            langsmith: Whether to enable LangSmith tracing (default: False)
         
         Returns:
             Instance of the appropriate client
@@ -52,8 +62,17 @@ class ClientFactory:
                 f"Available providers: {available}"
             )
         
-        client_class = cls._clients[provider_lower]
-        return client_class(api_key=api_key)
+        # Choose the appropriate client class based on langsmith flag
+        if langsmith:
+            client_class = cls._clients_smith.get(provider_lower)
+            if not client_class:
+                # Fallback to regular client if Smith variant doesn't exist
+                print(f"Warning: LangSmith variant not available for {provider}, using regular client")
+                client_class = cls._clients[provider_lower]
+        else:
+            client_class = cls._clients[provider_lower]
+        
+        return client_class(api_key=api_key, langsmith=langsmith)
     
     @classmethod
     def get_available_providers(cls) -> List[str]:
@@ -111,13 +130,14 @@ class ClientFactory:
 
 
 # Convenience function for quick client creation
-def create_client(provider: str, api_key: Optional[str] = None) -> BaseAIClient:
+def create_client(provider: str, api_key: Optional[str] = None, langsmith: bool = False) -> BaseAIClient:
     """
     Convenience function to create a client
     
     Args:
         provider: Name of the provider ('openai', 'gemini', etc.)
         api_key: Optional API key
+        langsmith: Whether to enable LangSmith tracing (default: False)
     
     Returns:
         Instance of the appropriate client
@@ -126,4 +146,4 @@ def create_client(provider: str, api_key: Optional[str] = None) -> BaseAIClient:
         >>> from client_factory import create_client
         >>> client = create_client('openai')
     """
-    return ClientFactory.create_client(provider, api_key)
+    return ClientFactory.create_client(provider, api_key, langsmith)

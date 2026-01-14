@@ -1,104 +1,90 @@
 # AI Client Framework
 
-Un framework agnóstico y extensible para orquestar múltiples LLMs (OpenAI, Gemini, etc.) con soporte nativo para **Prompt Engineering Estructurado**, **Caching Optimization** y **Workflows Agenciales**.
+Un framework agnóstico y extensible para orquestar múltiples LLMs (OpenAI, Gemini, etc.) con soporte nativo para **Prompt Engineering Estructurado**, **Tracing Avanzado** y **Workflows Agenciales Complejos**.
 
 ## 🎯 Core Features
 
-- **Multi-Provider Unified API**: Interfaz polimórfica para OpenAI y Gemini.
-- **Structured Prompt Engine**: Clase `Prompt` robusta con separación lógica de contexto (System, Few-Shot, User).
-- **Advanced Caching Strategy**: Análisis de tokens estáticos/dinámicos para maximizar el Cache Hit Ratio (Context Caching).
-- **Structured Outputs (JSON/Pydantic)**: Validación de esquemas de salida y parsing automático integrado.
-- **Template System**: Interpolación de variables `[[variable]]` y validación de integridad.
-- **LangGraph Ready**: Integración directa para construir grafos de estado y agentes complejos.
+- **Multi-Provider Unified API**: Interfaz polimórfica perfeccionada para OpenAI (vía Responses API) y Google Gemini (vía `google-genai` SDK).
+- **Structured Prompt Engine**: Clase `Prompt` robusta con soporte para `system_instruction`, `few-shot examples`, templates con `[[variables]]` y esquemas de salida.
+- **Observability (LangSmith)**: Integración nativa con LangSmith para tracing detallado, metadatos de tokens, modelos y proveedores.
+- **Agentic Orchestration (LangGraph)**: Diseño optimizado para grafos de estado complejos con nodos especializados y operaciones de mapeo.
+- **Advanced Pricing & Counting Engine**: Gestión centralizada de más de 60 modelos con pricing detallado (input, output, cached) en `config.py`.
+- **Structured Outputs (Pydantic)**: Validación estricta y automática de respuestas JSON usando modelos Pydantic directamente en el motor de prompts.
 
 ## 📁 Tech Stack & Structure
 
 ```
 IA/
-├── client_factory.py       # Factory Pattern para instanciación dinámica de proveedores
-├── prompt.py               # Motor de prompts estructurados, validación y templates
-├── base_client.py          # Abstract Base Class (ABC) para estandarización de contratos
-├── prompt_optimizer.py     # Análisis de tokens y heurísticas de caching
-├── langgraph_prueba.py     # Implementación de referencia para flujos agenciales
-└── config.py               # Gestión centralizada de modelos y pricing
+├── base_client.py           # Abstract Base Class para estandarización de contratos
+├── client_factory.py        # Factory para instanciación dinámica y selección de modo (Smith/Regular)
+├── openai_client.py         # Cliente especializado para OpenAI (Responses API)
+├── gemini_client.py         # Cliente especializado para Google Gemini (SDK 2.0)
+├── openai_client_smith.py   # Variante con Tracing para OpenAI
+├── gemini_client_smith.py   # Variante con Tracing para Gemini
+├── prompt.py                # Motor de prompts estructurados y validación
+├── config.py                # Base de datos de modelos (GPT-5, O-Series, Gemini 2.0) y pricing
+└── langgraph_prueba_2.py    # Workflow agencial completo (Ideación -> Outline -> Writing -> Edit)
 ```
 
 ## 🚀 Quick Start
 
-### 1. Instalación
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Configuración (.env)
+### 1. Configuración (.env)
 ```env
-OPENAI_API_KEY=-...
+OPENAI_API_KEY=sk-...
 GEMINI_API_KEY=...
+# Opcional para Tracing
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=ls__...
+LANGCHAIN_PROJECT="my-project"
 ```
 
-### 3. Usage: Structured Prompting & Pydantic
-Generación de contenido con validación de esquema estricta.
-
+### 2. Usage: Structured Output & LangSmith
 ```python
 from client_factory import create_client
 from prompt import Prompt
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-# Definir esquema de salida esperado
-class AnalysisResult(BaseModel):
-    sentiment: str
-    key_points: list[str]
-    confidence_score: float
+class BookInfo(BaseModel):
+    title: str
+    author: str
+    summary: str = Field(description="Un resumen breve del libro")
 
-client = create_client('gemini') # o 'openai'
-client.select_model('gemini-1.5-pro')
+# langsmith=True activa automáticamente la variante Smith del cliente
+client = create_client('gemini', langsmith=True)
+client.select_model('gemini-2.0-flash-lite')
 
-# Construcción del Prompt Estructurado
 prompt = (
     Prompt()
-    .set_system("Eres un analista de datos senior.")
-    .add_few_shot_example(
-        user="Analiza: 'El producto es lento pero funcional'", 
-        assistant='{"sentiment": "neutral", "confidence_score": 0.8}'
-    )
-    .set_user_input("Analiza este feedback: [[feedback]]")
-    .set_variable("feedback", "La nueva UI es increíble y muy rápida.")
-    .set_output_schema(AnalysisResult) # Pydantic binding
+    .set_system("Eres un experto bibliotecario.")
+    .set_user_input("Dame información sobre el libro 'Rayuela'")
+    .set_output_schema(BookInfo)
 )
 
-# Ejecución
-response, metadata = client.get_response(
-    prompt, 
-    response_schema=prompt.get_output_schema()
-)
-
-print(response) # Instancia validada de AnalysisResult o dict
+response_json, usage = client.get_response(prompt)
+print(response_json) # JSON parseado automáticamente
 ```
 
-### 4. Usage: Agentic Workflow (LangGraph)
-Ejemplo de integración en grafos de estado (`langgraph_prueba.py`).
+## 🧠 Workflows Agenciales (LangGraph)
 
-```python
-def ideation_node(state: AgentState):
-    client = ClientFactory.create_client('openai')
-    prompt = Prompt().set_system("Generate innovative ideas...").set_user_input(state['topic'])
-    response, _ = client.get_response(prompt)
-    return {"idea": response}
+El framework brilla en implementaciones de grafos. El archivo `langgraph_prueba_2.py` implementa un flujo de escritura profesional:
 
-workflow = StateGraph(AgentState)
-workflow.add_node("ideation", ideation_node)
-# ... compilar y ejecutar
-```
+1.  **Ideation**: Genera y selecciona el mejor ángulo para un tema.
+2.  **Outline**: Crea una estructura de 3 a 5 secciones usando **Structured Output**.
+3.  **Writing**: Genera contenido detallado para cada sección en paralelo.
+4.  **Assembler**: Une las piezas manteniendo la coherencia.
+5.  **Editor**: Refina el tono y estilo (con lógica de retroalimentación).
 
-## � Performance & Optimization
+## 📊 Modelos Soportados
 
-- **Token Counting**: Integración con `tiktoken` (OpenAI) y APIs nativas.
-- **Cost Estimation**: Estimación en tiempo real basada en pricing configurable (`config.py`).
-- **Cache Analytics**: `client.optimize_prompt_for_caching(messages)` analiza el payload para recomendar estrategias de `TTL` y orden de mensajes.
+Soporte integrado para más de 60 modelos, incluyendo:
+- **OpenAI**: `gpt-5-nano`, `gpt-5-mini`, `gpt-4.5-preview`, `o1`, `o3-mini`, `gpt-4o`.
+- **Gemini**: `gemini-2.0-flash`, `gemini-2.0-flash-lite`, `gemini-1.5-pro`, `gemini-1.5-flash-8b`.
 
-## 🤝 Extensibility
+## 🛠️ Tracing & Debugging
 
-Para agregar un nuevo proveedor (ej. Claude), implementar `BaseAIClient` y registrar en `ClientFactory`. El `Prompt` class es agnóstico al modelo.
+El framework utiliza un patrón de **Herencia Especializada** para el tracing:
+- Los clientes base (`OpenAIClient`, `GeminiClient`) son livianos y sin decoradores.
+- Los clientes Smith (`OpenAIClientSmith`, `GeminiClientSmith`) inyectan decoradores `@traceable` y metadatos detallados de tokens/costo a LangSmith sin ensuciar la lógica base del usuario.
 
 ---
-*License: MIT | Contribuciones bienvenidas mediante PRs.*
+*License: MIT | Desarrollado para el futuro de la IA Agencial.*

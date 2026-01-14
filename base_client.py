@@ -42,14 +42,16 @@ class BaseAIClient(ABC):
     All concrete implementations (OpenAI, Gemini, etc.) must implement these methods.
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, langsmith: bool = False):
         """
         Initialize the AI client
         
         Args:
             api_key: API key for the service. If None, will try to load from environment
+            langsmith: Whether to enable LangSmith tracing (default: False)
         """
         self.api_key = api_key
+        self.langsmith = langsmith
         self.current_model: Optional[str] = None
         self._client = None
         

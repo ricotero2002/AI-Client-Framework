@@ -8,13 +8,12 @@ from base_client import BaseAIClient, TokenUsage, CostEstimate, CachingRecommend
 from prompt_optimizer import PromptOptimizer
 from config import Config
 
-
 class OpenAIClient(BaseAIClient):
     """OpenAI API client implementation"""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, langsmith: bool = False):
         """Initialize OpenAI client"""
-        super().__init__(api_key)
+        super().__init__(api_key, langsmith)
         
         # Get API key from config if not provided
         if not self.api_key:
@@ -57,7 +56,6 @@ class OpenAIClient(BaseAIClient):
             )
         self.current_model = model_name
     
-    
     def get_response(
         self, 
         prompt, 
@@ -82,11 +80,19 @@ class OpenAIClient(BaseAIClient):
             final_config = {**config, **kwargs}
             
             # Make API call using new Responses API
-            response = self._client.responses.create(
-                model=model,
-                input=messages,
-                **final_config
-            )
+            if prompt.has_structured_output():
+                response = self._client.responses.parse(
+                    model=model,
+                    input=messages,
+                    text_format=prompt.get_pydantic_model(),
+                    **final_config,
+                )
+            else:
+                response = self._client.responses.create(
+                    model=model,
+                    input=messages,
+                    **final_config,
+                )
             
             # Extract response text from output
             response_text = response.output_text
@@ -108,7 +114,7 @@ class OpenAIClient(BaseAIClient):
                 total_tokens=usage.total_tokens,
                 cached_tokens=cached_tokens
             )
-            
+
             return response_text, token_usage
             
         except RateLimitError as e:
@@ -119,7 +125,7 @@ class OpenAIClient(BaseAIClient):
             raise Exception(f"OpenAI API error: {str(e)}")
         except Exception as e:
             raise Exception(f"Unexpected error: {str(e)}")
-    
+
     def count_tokens(self, text: str, model: Optional[str] = None) -> int:
         """Count tokens in text using tiktoken"""
         tokenizer = self._get_tokenizer(model)

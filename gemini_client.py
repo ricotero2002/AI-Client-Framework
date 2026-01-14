@@ -8,12 +8,13 @@ from prompt_optimizer import PromptOptimizer
 from config import Config
 
 
+
 class GeminiClient(BaseAIClient):
     """Google Gemini API client implementation"""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, langsmith: bool = False):
         """Initialize Gemini client"""
-        super().__init__(api_key)
+        super().__init__(api_key, langsmith)
         
         # Get API key from config if not provided
         if not self.api_key:
@@ -74,7 +75,6 @@ class GeminiClient(BaseAIClient):
         
         return system_instruction, user_content
     
-    
     def get_response(
         self, 
         prompt, 
@@ -113,11 +113,14 @@ class GeminiClient(BaseAIClient):
             
             # Merge with any additional kwargs (kwargs take precedence)
             config_params.update(gemini_gen_config)
-            config_params.update(kwargs)
+            if prompt.has_structured_output():
+                config_params['response_mime_type'] = "application/json"
+                config_params['response_json_schema'] = prompt.get_pydantic_model().model_json_schema()
             
             # Create config object if we have parameters
             config = types.GenerateContentConfig(**config_params) if config_params else None
             
+
             # Make API call using new SDK
             response = self._client.models.generate_content(
                 model=self.current_model,
@@ -142,7 +145,7 @@ class GeminiClient(BaseAIClient):
                 total_tokens=usage_metadata.total_token_count,
                 cached_tokens=cached_tokens
             )
-            
+
             return response_text, token_usage
             
         except Exception as e:
