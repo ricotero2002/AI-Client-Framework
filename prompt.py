@@ -51,6 +51,15 @@ class CachingAnalysis:
     recommendations: List[str]
 
 
+@dataclass
+class FineTuningEvaluation:
+    """Evaluation results for fine-tuning recommendation"""
+    recommend_fine_tuning: bool
+    total_static_tokens: int
+    threshold: int
+    reason: str
+
+
 class Prompt:
     """
     Structured prompt with separation of static and dynamic content.
@@ -87,6 +96,15 @@ class Prompt:
         # Template variables and file attachments
         self._template_variables: Dict[str, str] = {}
         self._file_attachments: List[Dict[str, Any]] = []
+        
+        # Database persistence
+        self._prompt_id: Optional[int] = None
+        self._prompt_hash: Optional[str] = None
+        self._conversation_id: Optional[int] = None
+        
+        # Conversation context (separate from few-shots)
+        self._conversation_context: List[Dict[str, str]] = []
+        self._max_context_messages: int = 10
         
         # Set default delimiters if enabled
         if use_delimiters:
@@ -596,13 +614,23 @@ class Prompt:
             content = self._replace_variables(self._system_message)
             messages.append({'role': 'system', 'content': content})
         
-        # Add few-shot examples
+        # Add few-shot examples (for teaching behavior)
         if self._few_shot_examples:
             for example in self._few_shot_examples:
                 user_content = self._replace_variables(example.user)
                 assistant_content = self._replace_variables(example.assistant)
                 messages.append({'role': 'user', 'content': user_content})
                 messages.append({'role': 'assistant', 'content': assistant_content})
+        
+        # Add conversation context (chat history)
+        if self._conversation_context:
+            # Limit context to max_context_messages
+            context_to_use = self._conversation_context[-self._max_context_messages:] if len(self._conversation_context) > self._max_context_messages else self._conversation_context
+            
+            for msg in context_to_use:
+                # Skip system messages from context (we already have one)
+                if msg['role'] != 'system':
+                    messages.append({'role': msg['role'], 'content': msg['content']})
         
         # Add user input
         if self._user_input:
@@ -800,6 +828,288 @@ class Prompt:
             should_use_caching=should_use_caching,
             recommendations=recommendations
         )
+    
+    def evaluate_fine_tuning(self, token_counter: Callable[[str], int], threshold: int = 2000) -> FineTuningEvaluation:
+        """
+        Evaluate if fine-tuning is recommended based on static content size
+        
+        Args:
+            token_counter: Function to count tokens in text
+            threshold: Token threshold for recommendation (default 2000)
+            
+        Returns:
+            FineTuningEvaluation with recommendation
+        """
+        # Count static tokens (system + few-shot)
+        static_tokens = 0
+        if self._system_message:
+            static_tokens += token_counter(self._system_message)
+            
+        for example in self._few_shot_examples:
+            static_tokens += token_counter(example.user)
+            static_tokens += token_counter(example.assistant)
+            
+        recommend_fine_tuning = static_tokens >= threshold
+        
+        if recommend_fine_tuning:
+            reason = f"Static content ({static_tokens} tokens) exceeds threshold ({threshold}). Fine-tuning may be more cost-effective and efficient."
+        else:
+            reason = f"Static content ({static_tokens} tokens) is within limits ({threshold}). Few-shot prompting is appropriate."
+            
+        return FineTuningEvaluation(
+            recommend_fine_tuning=recommend_fine_tuning,
+            total_static_tokens=static_tokens,
+            threshold=threshold,
+            reason=reason
+        )
+    
+    # ==================== Database Persistence Methods ====================
+    
+    def save(self) -> 'Prompt':
+        """
+        Save prompt template to database and get assigned ID
+        
+        Returns:
+            Self for method chaining
+            
+        Example:
+            >>> prompt = Prompt().set_system("You are helpful")
+            >>> prompt.save()
+            >>> print(prompt.get_id())  # Database ID
+        """
+        from database import get_db_manager
+        
+        # Prepare few-shot examples for serialization
+        few_shot_data = None
+        if self._few_shot_examples:
+            few_shot_data = [
+                {'user': ex.user, 'assistant': ex.assistant}
+                for ex in self._few_shot_examples
+            ]
+        
+        # Save to database
+        db = get_db_manager()
+        prompt_record = db.save_prompt(self._system_message, few_shot_data)
+        
+        # Store ID and hash
+        self._prompt_id = prompt_record.id
+        self._prompt_hash = prompt_record.prompt_hash
+        
+        return self
+    
+    def get_id(self) -> Optional[int]:
+        """
+        Get database ID of saved prompt
+        
+        Returns:
+            Prompt ID or None if not saved
+        """
+        return self._prompt_id
+    
+    def save_usage(
+        self,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        response: Optional[str] = None,
+        cost: Optional[float] = None,
+        quality_score: Optional[float] = None
+    ) -> 'Prompt':
+        """
+        Save prompt execution metrics to database
+        
+        Args:
+            model: Model used for execution
+            input_tokens: Number of input tokens
+            output_tokens: Number of output tokens
+            response: Response text (optional)
+            cost: Execution cost (optional)
+            quality_score: Quality score (optional)
+            
+        Returns:
+            Self for method chaining
+            
+        Example:
+            >>> prompt.save_usage('gpt-4o', 100, 50, cost=0.002)
+        """
+        from database import get_db_manager
+        
+        # Ensure prompt is saved first
+        if self._prompt_id is None:
+            self.save()
+        
+        # Save usage record
+        db = get_db_manager()
+        db.save_usage(
+            prompt_id=self._prompt_id,
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            response=response,
+            quality_score=quality_score,
+            cost=cost
+        )
+        
+        return self
+    
+    def get_usage_stats(self) -> Dict[str, Any]:
+        """
+        Retrieve usage statistics for this prompt
+        
+        Returns:
+            Dictionary with usage statistics:
+            - total_calls: Number of times prompt was used
+            - total_input_tokens: Total input tokens
+            - total_output_tokens: Total output tokens
+            - total_cost: Total cost
+            - avg_quality_score: Average quality score
+            
+        Example:
+            >>> stats = prompt.get_usage_stats()
+            >>> print(f"Used {stats['total_calls']} times")
+        """
+        from database import get_db_manager
+        
+        if self._prompt_id is None:
+            return {
+                'total_calls': 0,
+                'total_input_tokens': 0,
+                'total_output_tokens': 0,
+                'total_cost': 0.0,
+                'avg_quality_score': None
+            }
+        
+        db = get_db_manager()
+        return db.get_usage_stats(self._prompt_id)
+    
+    def set_conversation_context(self, messages: List[Dict[str, str]], max_context_messages: Optional[int] = None) -> 'Prompt':
+        """
+        Set conversation history as context for the prompt
+        
+        This stores conversation context SEPARATELY from few-shot examples.
+        Few-shot examples are for teaching the model behavior, while conversation
+        context is for maintaining chat history.
+        
+        If context exceeds max_context_messages, it will be automatically summarized.
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            max_context_messages: Maximum context messages before summarization
+            
+        Returns:
+            Self for method chaining
+            
+        Example:
+            >>> prompt = Prompt().set_system("You are helpful")
+            >>> prompt.add_few_shot_example("What is 2+2?", "4")  # Teaching behavior
+            >>> history = [
+            ...     {'role': 'user', 'content': 'Hello'},
+            ...     {'role': 'assistant', 'content': 'Hi there!'}
+            ... ]
+            >>> prompt.set_conversation_context(history)  # Chat history
+        """
+        if max_context_messages is not None:
+            self._max_context_messages = max_context_messages
+        
+        # Store conversation context separately
+        self._conversation_context = messages
+        
+        # If context is too long, we'll handle it in to_messages()
+        return self
+    
+    def get_usage_by_model(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get usage statistics grouped by model
+        
+        Returns:
+            Dictionary with model names as keys and stats as values
+            
+        Example:
+            >>> stats = prompt.get_usage_by_model()
+            >>> print(stats['gpt-4o-mini'])
+            {'calls': 5, 'avg_input_tokens': 120, 'avg_output_tokens': 80, 'avg_cost': 0.0012}
+        """
+        from database import get_db_manager
+        
+        if self._prompt_id is None:
+            return {}
+        
+        db = get_db_manager()
+        session = db.get_session()
+        
+        try:
+            from database import PromptUsage
+            usages = session.query(PromptUsage).filter(
+                PromptUsage.prompt_id == self._prompt_id
+            ).all()
+            
+            if not usages:
+                return {}
+            
+            # Group by model
+            model_stats = {}
+            for usage in usages:
+                model = usage.model
+                if model not in model_stats:
+                    model_stats[model] = {
+                        'calls': 0,
+                        'total_input_tokens': 0,
+                        'total_output_tokens': 0,
+                        'total_cost': 0.0,
+                        'quality_scores': []
+                    }
+                
+                model_stats[model]['calls'] += 1
+                model_stats[model]['total_input_tokens'] += usage.input_tokens
+                model_stats[model]['total_output_tokens'] += usage.output_tokens
+                model_stats[model]['total_cost'] += usage.cost or 0.0
+                if usage.quality_score is not None:
+                    model_stats[model]['quality_scores'].append(usage.quality_score)
+            
+            # Calculate averages
+            for model, stats in model_stats.items():
+                calls = stats['calls']
+                stats['avg_input_tokens'] = stats['total_input_tokens'] / calls
+                stats['avg_output_tokens'] = stats['total_output_tokens'] / calls
+                stats['avg_cost'] = stats['total_cost'] / calls
+                
+                if stats['quality_scores']:
+                    stats['avg_quality_score'] = sum(stats['quality_scores']) / len(stats['quality_scores'])
+                else:
+                    stats['avg_quality_score'] = None
+                
+                # Remove temporary list
+                del stats['quality_scores']
+            
+            return model_stats
+            
+        finally:
+            session.close()
+    
+    def get_average_cost(self, model: Optional[str] = None) -> float:
+        """
+        Get average cost per call for this prompt
+        
+        Args:
+            model: Optional model name to filter by. If None, returns overall average.
+            
+        Returns:
+            Average cost per call
+            
+        Example:
+            >>> avg_cost = prompt.get_average_cost('gpt-4o-mini')
+            >>> print(f"Average cost: ${avg_cost:.6f}")
+        """
+        if model:
+            model_stats = self.get_usage_by_model()
+            if model in model_stats:
+                return model_stats[model]['avg_cost']
+            return 0.0
+        else:
+            stats = self.get_usage_stats()
+            if stats['total_calls'] > 0:
+                return stats['total_cost'] / stats['total_calls']
+            return 0.0
     
     def optimize_for_caching(self) -> 'Prompt':
         """

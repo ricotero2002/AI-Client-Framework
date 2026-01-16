@@ -26,3 +26,11 @@ Thumbs.db
 # Generated outputs
 resultado_articulo.md
 *.log
+
+# Database files
+data/
+*.db
+*.db-journal
+
+improved_prompt.txt
+evaluation_results.txt
