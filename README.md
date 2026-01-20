@@ -505,11 +505,6 @@ MIT License
 
 ## 🚀 Roadmap
 
-- [ ] Soporte para más providers (Cohere, Mistral)
-- [ ] Dashboard web para visualizar estadísticas
-- [ ] A/B testing automático entre versiones de prompts
-- [ ] Integración con CI/CD para regression testing
-- [ ] Export de evaluaciones a CSV/JSON
 
 ---
 

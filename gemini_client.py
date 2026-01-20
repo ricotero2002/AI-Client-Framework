@@ -82,6 +82,12 @@ class GeminiClient(BaseAIClient):
     ) -> Tuple[str, TokenUsage]:
         """Get response from Gemini API using new google.genai SDK"""
         try:
+            # Import Prompt class to check type
+            from prompt import Prompt
+            
+            # Store original prompt to check for structured output
+            original_prompt = prompt
+            
             # Convert prompt to messages format
             messages = self._convert_prompt_to_messages(prompt)
             
@@ -113,9 +119,11 @@ class GeminiClient(BaseAIClient):
             
             # Merge with any additional kwargs (kwargs take precedence)
             config_params.update(gemini_gen_config)
-            if prompt.has_structured_output():
+            
+            # Check for structured output only if original_prompt is a Prompt object
+            if isinstance(original_prompt, Prompt) and original_prompt.has_structured_output():
                 config_params['response_mime_type'] = "application/json"
-                config_params['response_json_schema'] = prompt.get_pydantic_model().model_json_schema()
+                config_params['response_json_schema'] = original_prompt.get_pydantic_model().model_json_schema()
             
             # Create config object if we have parameters
             config = types.GenerateContentConfig(**config_params) if config_params else None
