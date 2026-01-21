@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Agente - Simple</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f4f4f9;
+            padding: 20px;
+        }
+
+        #chat-container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .msg {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+
+        .user {
+            align-self: flex-end;
+            background: #007bff;
+            color: white;
+        }
+
+        .ai {
+            align-self: flex-start;
+            background: #e9ecef;
+            color: #333;
+        }
+
+        input,
+        button {
+            padding: 10px;
+        }
+
+        #input-box {
+            width: 70%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="chat-container">
+        <h3>Agente Persistente (Invoke)</h3>
+        <input type="text" id="thread-id" placeholder="ID de Sesión" value="user_1">
+        <div id="messages"></div>
+        <input type="text" id="input-box" placeholder="Escribe un mensaje...">
+        <button onclick="sendMessage()">Enviar</button>
+    </div>
+
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const inputBox = document.getElementById('input-box');
+        const threadInput = document.getElementById('thread-id');
+
+        async function sendMessage() {
+            const text = inputBox.value;
+            const threadId = threadInput.value;
+            if (!text) return;
+
+            appendMessage('user', text);
+            inputBox.value = '';
+
+            try {
+                const response = await fetch('/agente/invoke', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        input: { messages: [{ type: "human", content: text }] },
+                        config: { configurable: { thread_id: threadId } }
+                    })
+                });
+
+                const data = await response.json();
+                console.log("Response:", data);
+
+                if (data.output && data.output.messages) {
+                    const lastMsg = data.output.messages[data.output.messages.length - 1];
+                    appendMessage('ai', lastMsg.content || JSON.stringify(lastMsg));
+                } else {
+                    appendMessage('ai', JSON.stringify(data));
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                appendMessage('ai', `Error: ${error.message}`);
+            }
+        }
+
+        function appendMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = `msg ${role}`;
+            div.innerText = text;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            return div;
+        }
+    </script>
+</body>
+
+</html>

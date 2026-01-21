@@ -27,3 +27,14 @@ langsmith
 # Database support
 sqlalchemy>=2.0.0
 python-dateutil>=2.8.0
+
+langchain_community
+wikipedia
+transformers
+torch
+pyowm
+langgraph-checkpoint-sqlite
+fastapi 
+langserve 
+uvicorn
+sse_starlette

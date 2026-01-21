@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Agente LangGraph</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f4f4f9;
+            padding: 20px;
+        }
+
+        #chat-container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .msg {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+
+        .user {
+            align-self: flex-end;
+            background: #007bff;
+            color: white;
+        }
+
+        .ai {
+            align-self: flex-start;
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .status {
+            font-size: 0.8em;
+            color: #888;
+            font-style: italic;
+        }
+
+        input,
+        button {
+            padding: 10px;
+        }
+
+        #input-box {
+            width: 70%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="chat-container">
+        <h3>Agente Persistente</h3>
+        <input type="text" id="thread-id" placeholder="ID de Sesión (ej: session_1)" value="user_1">
+        <div id="messages"></div>
+        <input type="text" id="input-box" placeholder="Escribe un mensaje...">
+        <button onclick="sendMessage()">Enviar</button>
+    </div>
+
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const inputBox = document.getElementById('input-box');
+        const threadInput = document.getElementById('thread-id');
+
+        async function sendMessage() {
+            const text = inputBox.value;
+            const threadId = threadInput.value;
+            if (!text) return;
+
+            appendMessage('user', text);
+            inputBox.value = '';
+
+            // Endpoint de streaming de LangServe
+            const response = await fetch('/agente/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    input: { messages: [{ type: "human", content: text }] },
+                    config: { configurable: { thread_id: threadId } }
+                })
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let aiMsgDiv = appendMessage('ai', '...');
+            let currentText = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                // LangServe envía eventos con prefijo "event: data"
+                const lines = chunk.split('\n');
+
+                lines.forEach(line => {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const eventData = JSON.parse(line.slice(6));
+                            // Buscamos la actualización del nodo 'agent'
+                            if (eventData.agent && eventData.agent.messages) {
+                                const lastMsg = eventData.agent.messages[eventData.agent.messages.length - 1];
+                                if (lastMsg.content) {
+                                    currentText = lastMsg.content;
+                                    aiMsgDiv.innerText = currentText;
+                                }
+                            }
+                            // Feedback de tools
+                            if (eventData.tools) {
+                                appendStatus("Ejecutando herramientas...");
+                            }
+                        } catch (e) { }
+                    }
+                });
+            }
+        }
+
+        function appendMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = `msg ${role}`;
+            div.innerText = text;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            return div;
+        }
+
+        function appendStatus(text) {
+            const div = document.createElement('div');
+            div.className = 'status';
+            div.innerText = text;
+            messagesDiv.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+    </script>
+
+</body>
+
+</html>

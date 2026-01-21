@@ -21,7 +21,7 @@ class GeminiClientSmith(GeminiClient):
         if os.environ.get("LANGCHAIN_API_KEY"):
             try:
                 from langsmith.wrappers import wrap_gemini
-                self._client = wrap_gemini(client=self._client,tracing_extra= TracingExtra)
+                self._client = wrap_gemini(client=self._client)
             except ImportError:
                 print("LangSmith not installed. Skipping tracing.")
         else:
