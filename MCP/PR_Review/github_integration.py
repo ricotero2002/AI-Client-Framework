@@ -73,5 +73,5 @@ def fetch_pr_changes(repo_owner: str, repo_name: str, pr_number: int) -> list:
 
 # Example usage for debugging
 if __name__ == "__main__":
-    pr_data = fetch_pr_changes('ricotero2002', 'OOPingo', 1)
+    pr_data = fetch_pr_changes('ricotero2002', 'AI-Client-Framework', 1)
     print(pr_data) 

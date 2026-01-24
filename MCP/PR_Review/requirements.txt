@@ -2,3 +2,6 @@
 requests>=2.31.0          # For GitHub API calls
 mcp[cli]>=1.4.0          # For MCP server functionality
 notion-client>=2.3.0      # For Notion integration
+mcp>=1.4.0
+fastapi
+uvicorn
