@@ -36,7 +36,7 @@ EVALUATION_MODEL = os.getenv("EVALUATION_MODEL", "gemini-2.0-flash-exp")
 
 # Configuración de modelo para expansión de queries (Advanced RAG)
 EXPANSION_LLM_PROVIDER = os.getenv("EXPANSION_LLM_PROVIDER", "gemini")
-EXPANSION_MODEL = os.getenv("EXPANSION_MODEL", "gemini-2.5-flash")
+EXPANSION_MODEL = os.getenv("EXPANSION_MODEL", "gemini-2.5-flash-lite")
 
 # Configuración de embeddings
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
@@ -53,3 +53,5 @@ EVAL_METRICS = os.getenv("EVAL_METRICS", "latency,cost,relevance,clarity,concise
 # Configuración de logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2", "true")
