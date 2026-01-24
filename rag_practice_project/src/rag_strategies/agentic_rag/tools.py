@@ -4,9 +4,46 @@ from langchain_core.tools import tool
 from pathlib import Path
 import sys
 import json
+from sentence_transformers import CrossEncoder
+import numpy as np
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent.parent.parent))
+
+class Reranker:
+    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
+        """
+        Modelos recomendados:
+        - "cross-encoder/ms-marco-MiniLM-L-6-v2" (Rápido y ligero)
+        - "cross-encoder/ms-marco-MiniLM-L-12-v2" (Más preciso)
+        - "BAAI/bge-reranker-base" (Excelente rendimiento actual)
+        """
+        print(f"Cargando modelo de Reranking: {model_name}...")
+        self.model = CrossEncoder(model_name)
+
+    def rerank(self, query: str, documents: list, metadatas: list, top_n: int = 3):
+        """
+        Reordena los documentos recuperados por relevancia.
+        """
+        if not documents:
+            return [], [], []
+
+        # 1. Preparar los pares (Query, Documento) para el modelo
+        pairs = [[query, doc] for doc in documents]
+
+        # 2. Obtener los scores de relevancia (sigmoid scores)
+        scores = self.model.predict(pairs)
+
+        # 3. Ordenar índices de mayor a menor score
+        sorted_indices = np.argsort(scores)[::-1]
+
+        # 4. Seleccionar los mejores N
+        reranked_docs = [documents[i] for i in sorted_indices[:top_n]]
+        reranked_metadatas = [metadatas[i] for i in sorted_indices[:top_n]] 
+        # Convertir numpy float32 a Python float para JSON serialization
+        reranked_scores = [float(scores[i]) for i in sorted_indices[:top_n]]
+        
+        return reranked_docs, reranked_metadatas, reranked_scores
 
 class NutritionalFilter(BaseModel):
     """Filtro para valores nutricionales"""
@@ -74,7 +111,7 @@ REGLAS CRÍTICAS:
    - value: número extraído
    - **nutritional_filter_operator**: Si hay más de un filtro, indica si deben cumplirse todos ("$and") o al menos uno ("$or") basándote en conectores como "y" o "o". Por defecto usa "$and".
 4. **ingredient_filter**: Si menciona un ingrediente específico, extráelo (ej: "quinoa")
-5. **query**: Expande con sinónimos (ej: "sopas" → "sopas caldos consomés")
+5. **query**: Expande con sinónimos, escribilo en ingles (ej: "sopas" → "soups broths consommés")
 
 EJEMPLOS:
 - "Dame 3 recetas con mucha proteína" → user_asked_for=3, n_for_query=9, nutritional_filters=[{"field":"protein_g", "operator":"$gt", "value":15}]
@@ -111,38 +148,57 @@ def optimize_query(query: str) -> str:
     # Esta función será llamada por LangGraph con el cliente ya configurado
     # Por ahora, retorna un placeholder que será reemplazado en la implementación real
     from src.utils.llm_client import get_llm_client
-    from src.utils.config_loader import EXPANSION_LLM_PROVIDER, EXPANSION_MODEL
+    from src.utils.config_loader import EXPANSION_LLM_PROVIDER, EXPANSION_MODEL,LANGCHAIN_TRACING_V2
     
     expansion_client = get_llm_client(
         provider=EXPANSION_LLM_PROVIDER,
-        model=EXPANSION_MODEL
+        model=EXPANSION_MODEL,
+        langsmith=LANGCHAIN_TRACING_V2
     )
-    
-    return _optimize_query_impl(query, expansion_client)
+    try:
+        return _optimize_query_impl(query, expansion_client)
+    except Exception as e:
+        return f"Error optimizing query: {str(e)}"
 
-@tool("retrieve_documents", description="Recupera documentos de ChromaDB usando parámetros optimizados",args_schema=QueryOptimization)
-def retrieve_documents(query_params: QueryOptimization) -> dict:
+@tool("retrieve_documents", description="Recupera documentos de ChromaDB usando parámetros optimizados", args_schema=QueryOptimization)
+def retrieve_documents(**kwargs) -> dict:
     """
-    Recupera documentos de ChromaDB usando parámetros optimizados.
+    Recupera documentos de ChromaDB.
+    Acepta argumentos desempaquetados (query, n_for_query, etc.) y los valida contra QueryOptimization.
     """
     from src.vector_db.chroma_manager import ChromaDBManager
-    vector_db = ChromaDBManager()
     
-    where_metadata, where_document = query_params.to_chroma_filters()
-    
-    results = vector_db.query(
-        query_text=query_params.query,
-        n_results=query_params.n_for_query,
-        where_metadata=where_metadata,
-        where_text=where_document
-    )
-    
-    return {
-        "documents": results["documents"][0],
-        "metadatas": results["metadatas"][0],
-        "distances": results["distances"][0],
-        "user_asked_for": query_params.user_asked_for
-    }
+    try:
+        # 1. CRÍTICO: Reconstruir el objeto Pydantic desde los kwargs
+        # Esto maneja tanto la llamada automática de LangChain como tu inyección manual
+        print(f"DEBUG TOOL: Argumentos recibidos: {list(kwargs.keys())}")
+        query_params = QueryOptimization(**kwargs)
+        
+        # 2. Lógica de búsqueda (igual que antes)
+        vector_db = ChromaDBManager()
+        where_metadata, where_document = query_params.to_chroma_filters()
+        
+        results = vector_db.query(
+            query_text=query_params.query,
+            n_results=query_params.n_for_query,
+            where_metadata=where_metadata,
+            where_text=where_document
+        )
+        
+        if not results or not results["documents"]:
+             return "Error executing retrieval: No documents found for this query."
+             
+        return {
+            "documents": results["documents"][0],
+            "metadatas": results["metadatas"][0],
+            "distances": results["distances"][0],
+            "user_asked_for": query_params.user_asked_for
+        }
+        
+    except Exception as e:
+        # Retornamos el error como string para que el agente lo vea y pueda reaccionar
+        return f"Error executing retrieval: {str(e)}"
+
 
 def _retrieve_documents_impl(query_params: QueryOptimization) -> dict:
     """Helper para testear retrieval sin depender del decorador tool de langchain."""
@@ -150,6 +206,8 @@ def _retrieve_documents_impl(query_params: QueryOptimization) -> dict:
     vector_db = ChromaDBManager()
     
     where_metadata, where_document = query_params.to_chroma_filters()
+    print(where_metadata)
+    print(where_document)
     results = vector_db.query(
         query_text=query_params.query,
         n_results=query_params.n_for_query,
@@ -164,24 +222,57 @@ def _retrieve_documents_impl(query_params: QueryOptimization) -> dict:
     }
 
 
+def _rerank_documents_impl(query: str, retrieval_results_json: str) -> dict:
+    """
+    Re-rankea documentos y retorna top user_asked_for.
+    """
+    results = json.loads(retrieval_results_json)
+    documents = results["documents"]
+    metadatas = results["metadatas"]
+    user_asked_for = results["user_asked_for"]
+    
+    reranker = Reranker("cross-encoder/ms-marco-MiniLM-L-12-v2")
+    ranked_docs, ranked_meta, ranked_scores = reranker.rerank(
+        query, documents, metadatas, top_n=user_asked_for
+    )
+    
+    return {
+        "documents": ranked_docs,
+        "metadatas": ranked_meta,
+        "scores": ranked_scores
+    }
+
+@tool("rerank_documents", description="Re-rankea documentos y retorna top user_asked_for."  )
+def rerank_documents(query: str, retrieval_results_json: str) -> str:
+    """
+    Re-rankea documentos y retorna top user_asked_for.
+    """
+    try:
+        result = _rerank_documents_impl(query, retrieval_results_json)
+    except Exception as e:
+        return f"Error reranking documents: {str(e)}"
+    return json.dumps(result)
+
 if __name__ == "__main__":
     # Test con cliente LLM real
     print("🧪 Testing Query Optimization Tool\n")
     
     try:
         from src.utils.llm_client import get_llm_client
-        from src.utils.config_loader import EXPANSION_LLM_PROVIDER, EXPANSION_MODEL
+        from src.utils.config_loader import EXPANSION_LLM_PROVIDER, EXPANSION_MODEL,LANGCHAIN_TRACING_V2
         
         expansion_client = get_llm_client(
             provider=EXPANSION_LLM_PROVIDER,
-            model=EXPANSION_MODEL
+            model=EXPANSION_MODEL,
+            langsmith=LANGCHAIN_TRACING_V2
         )
         
         test_queries = [
-            "Dime 3 recetas con mucha proteína",
-            "Recetas de quinoa bajas en calorías",
-            "Dame 5 recetas con mucha proteína y poca grasa",
-            "Dame una receta con queso"
+            #"Dime 3 recetas con mucha proteína",
+            "Decime 3 recetas de sopas",
+            #"Recetas de quinoa bajas en calorías",
+            #"Dame 5 recetas con mucha proteína, y grasa",
+            #"Dame una receta con queso"
         ]
         
         for query in test_queries:
@@ -205,8 +296,18 @@ if __name__ == "__main__":
             retrieval_result = _retrieve_documents_impl(query_params)
             docs = retrieval_result["documents"]
             print(f"✅ Retrieved {len(docs)} documents.")
-            for i, doc in enumerate(docs[:2]): # Mostrar solo los 2 primeros para no saturar
+            for i, doc in enumerate(docs): # Mostrar solo los 2 primeros para no saturar
                 print(f"   [{i+1}] {doc[:100]}...")
+            print()
+            
+            # 3. RERANK
+            print(f"🔍 Testing Reranking for query parameters...")
+            reranked_result = _rerank_documents_impl(query_params.query, json.dumps(retrieval_result))
+            reranked_docs = reranked_result["documents"]
+            reranked_scores = reranked_result["scores"]
+            print(f"✅ Reranked {len(reranked_docs)} documents.")
+            for i, (doc, score) in enumerate(zip(reranked_docs, reranked_scores)): 
+                print(f"   [{i+1}] Score: {score:.4f} | {doc[:100]}...")
             print()
             
     except ImportError as e:
