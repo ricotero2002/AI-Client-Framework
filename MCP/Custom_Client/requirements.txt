@@ -1,0 +1,3 @@
+langchain_mcp_adapters
+langchain_google_genai
+fastmcp
