@@ -38,3 +38,12 @@ fastapi
 langserve 
 uvicorn
 sse_starlette
+
+# GBeder Multi-Agent System dependencies
+tavily-python>=0.3.0  # Tavily API client
+deepeval>=0.21.0  # LLM evaluation metrics
+mcp>=0.9.0  # Model Context Protocol SDK
+langchain-google-genai>=0.0.5  # Gemini integration for LangChain
+
+fastmcp
+langchain-mcp-adapters

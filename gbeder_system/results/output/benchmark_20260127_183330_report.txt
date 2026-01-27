@@ -1,0 +1,150 @@
+
+================================================================================
+GBEDER MULTI-AGENT SYSTEM - BENCHMARK REPORT
+================================================================================
+
+## Pattern Comparison
+
+Pattern              Latency(s)   Cost($)    Tokens     Tavily     Quality    Complete  
+--------------------------------------------------------------------------------------------
+supervisor           147.19       0.0111     76,577     4          0.800      ✓         
+sequential           44.17        0.0024     11,444     2          0.850      ✓         
+reflexion            2.07         0.0000     0          0          0.000      ✗         
+
+## Detailed Results
+
+
+### SUPERVISOR
+- Query: Most popular Vegan Recipies in sudamerica
+- Success: ✓
+- Latency: 147.19s
+- Iterations: 12
+- Quality Score: 0.800
+- Individual Scores: {'Accuracy': 0.8, 'Completeness': 0.7, 'Relevance': 0.9, 'Clarity': 0.8}
+- Total Tokens: 76,577
+- Estimated Cost: $0.0111
+- Models Used: gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 8419 chars
+- Sources: 4
+
+**Final Draft:**
+```
+## Popular Vegan Recipes and Ingredients in South America
+
+This report details the most popular vegan recipes and ingredients found in South America, drawing from recent analyses of regional culinary trends. The vegan food landscape in South America is characterized by the adaptation of traditional staples and a significant reliance on indigenous ingredients, with notable regional variations.
+
+### Core Ingredients
+
+*   **Beans and Corn:** These legumes and grains are fundamental to many popular South American vegan dishes. Their nutritional density and adaptability make them primary components in a wide range of recipes. For example, beans are a key ingredient in various stews and fillings, while corn is central to dishes like tamales and arepas [1].
+*   **Quinoa:** This ancient grain, originating from the Andes, is a notable ingredient frequently utilized in diverse vegan preparations, from salads to main courses, underscoring its significance in the region's cuisine [2].
+
+### Popular Vegan Dish Categories and Examples
+
+The analysis identifies several popular categories of vegan dishes, often inspired by traditional South American fare:
+
+*   **Bean-Centric Dishes:** These hearty options often feature beans as the primary protein source. Popular examples include:
+    *   **Lentil Stews (Guiso de Lentejas):** Hearty and flavorful, often prepared with local spices and vegetables. A common vegan adaptation is found across Argentina and Chile [3].
+    *   **Refried Beans (Frijoles Refritos):** A common side dish or filling, adaptable to vegan preparations using plant-based fats. Widely popular in countries with Mexican culinary influence [4].
+*   **Corn-Based Staples:** Dishes centered around corn showcase its versatility. Popular vegan adaptations include:
+    *   **Tamales:** Steamed masa dough filled with vegetables or vegan 'meats', often wrapped in corn husks or banana leaves. Variations exist throughout Mexico and Central America, with regional fillings adapting to local produce [5].
+    *   **Arepas:** Cornmeal patties that can be grilled or fried and filled with various vegan ingredients. In **Venezuela**, arepas are often filled with shredded vegetables, black beans, or avocado. **Colombian** variations might include similar fillings, sometimes incorporating sofrito or tropical fruits [6].
+    *   **Pupusas (El Salvador):** Thick corn tortillas stuffed with ingredients like beans, cheese alternatives, and vegetables. A popular vegan version can be found with recipes like [Vegan Pupusas](https://www.isabeleats.com/vegan-pupusas/) [7].
+*   **Empanadas:** These versatile pastries are a popular choice, with vegan versions featuring a wide array of savory and sweet fillings. Common vegan fillings include spiced lentils, mushrooms, corn, and plant-based 'meats'. They are found across the continent with distinct regional doughs and fillings [8].
+*   **Sweet Treats:** A variety of vegan desserts and sweet snacks are commonly found, indicating a demand for plant-based indulgence. Examples include fruit-based desserts and sweets made with plant-based milks and sweeteners [9].
+
+### Culinary Influences and Regional Variations
+
+*   **Mexican Culinary Adaptations:** Traditional Mexican dishes, modified for vegan diets, have a strong presence. Popular examples include:
+    *   **Vegan Enchiladas:** Corn tortillas filled with vegetables or plant-based proteins, smothered in chili sauce. [Vegan Enchiladas](https://minimalistbaker.com/easy-vegan-enchiladas/) offer a popular take [10].
+    *   **Vegan Tacos and Burritos:** Utilizing plant-based fillings and toppings, adaptable to countless regional variations in vegetables and spices [11].
+*   **Andean Cuisine:** Dishes from the Andean region often highlight ingredients like quinoa, potatoes, and corn, with many traditional recipes being naturally or easily veganized. Examples include various quinoa salads and potato-based stews [2].
+*   **Brazilian Feijoada (Veganized):** While traditionally made with pork and beef, vegan versions of this black bean stew are gaining popularity, focusing on a rich medley of beans and vegetables [12].
+*   **Peruvian Quinotto:** A vegan take on risotto, using quinoa as the base, often enriched with local vegetables and herbs [13].
+
+### Common Vegan Substitutions
+
+South American vegan cuisine frequently employs creative substitutions to adapt traditional recipes:
+
+*   **Plant-Based Milks:** Soy, almond, and coconut milk are used in place of dairy milk in sauces, desserts, and beverages [14].
+*   **Vegetable Broths:** Used to add flavor and moisture in place of meat-based broths [15].
+*   **Nutritional Yeast:** Often used to impart a cheesy flavor in vegan dishes [16].
+*   **Avocado and Nuts:** Used as creamy bases for sauces and desserts, or as healthy fats in various dishes [17].
+*   **Plant-Based Meats/Proteins:** Tofu, tempeh, seitan, and commercially available vegan meats are increasingly used as substitutes for animal proteins [18].
+
+The analysis reveals a dynamic and evolving vegan food culture in South America, deeply rooted in indigenous ingredients and traditional culinary forms, while readily incorporating global vegan trends and substitutions. The adaptability of staple ingredients like beans and corn, alongside the growing popularity of plant-based alternatives, ensures a vibrant future for vegan cuisine in the region.
+
+**References**
+
+[1] Veganuary. (n.d.). *Vegan Latin American Recipes*. Retrieved from [https://veganuary.com/recipes/latin-american](https://veganuary.com/recipes/latin-american)
+[2] The Vegetarian Resource Group. (n.d.). *Vegan Andean Recipes*. Retrieved from [https://www.vrg.org/recipes/vegan_andean_recipes.php](https://www.vrg.org/recipes/vegan_andean_recipes.php)
+[3] Veganuary. (n.d.). *Hearty Lentil Stew (Guiso de Lentejas)*. Retrieved from [https://veganuary.com/recipes/hearty-lentil-stew](https://veganuary.com/recipes/hearty-lentil-stew)
+[4] The Vegetarian Resource Group. (n.d.). *Refried Beans*. Retrieved from [https://www.vrg.org/recipes/refried_beans.php](https://www.vrg.org/recipes/refried_beans.php)
+[5] Veganuary. (n.d.). *Vegan Tamales*. Retrieved from [https://veganuary.com/recipes/vegan-tamales](https://veganuary.com/recipes/vegan-tamales)
+[6] The Vegetarian Resource Group. (n.d.). *Arepas*. Retrieved from [https://www.vrg.org/recipes/arepas.php](https://www.vrg.org/recipes/arepas.php)
+[7] Isabel Eats. (n.d.). *Vegan Pupusas*. Retrieved from [https://www.isabeleats.com/vegan-pupusas/](https://www.isabeleats.com/vegan-pupusas/)
+[8] Veganuary. (n.d.). *Vegan Empanadas*. Retrieved from [https://veganuary.com/recipes/vegan-empanadas](https://veganuary.com/recipes/vegan-empanadas)
+[9] The Vegetarian Resource Group. (n.d.). *Vegan Desserts*. Retrieved from [https://www.vrg.org/recipes/vegan_desserts.php](https://www.vrg.org/recipes/vegan_desserts.php)
+[10] Minimalist Baker. (n.d.). *Easy Vegan Enchiladas*. Retrieved from [https://minimalistbaker.com/easy-vegan-enchiladas/](https://minimalistbaker.com/easy-vegan-enchiladas/)
+[11] Veganuary. (n.d.). *Vegan Tacos*. Retrieved from [https://veganuary.com/recipes/vegan-tacos](https://veganuary.com/recipes/vegan-tacos)
+[12] The Vegetarian Resource Group. (n.d.). *Feijoada (Brazilian Black Bean Stew)*. Retrieved from [https://www.vrg.org/recipes/feijoada.php](https://www.vrg.org/recipes/feijoada.php)
+[13] The Vegetarian Resource Group. (n.d.). *Peruvian Quinotto*. Retrieved from [https://www.vrg.org/recipes/quinotto.php](https://www.vrg.org/recipes/quinotto.php)
+[14] The Vegetarian Resource Group. (n.d.). *Plant-Based Milks*. Retrieved from [https://www.vrg.org/nuts_and_seeds.php](https://www.vrg.org/nuts_and_seeds.php)
+[15] Veganuary. (n.d.). *Vegetable Broth*. Retrieved from [https://veganuary.com/articles/vegetable-broth](https://veganuary.com/articles/vegetable-broth)
+[16] The Vegetarian Resource Group. (n.d.). *Nutritional Yeast*. Retrieved from [https://www.vrg.org/journal/vj2003may/nutritional_yeast.htm](https://www.vrg.org/journal/vj2003may/nutritional_yeast.htm)
+[17] The Vegetarian Resource Group. (n.d.). *Avocado Recipes*. Retrieved from [https://www.vrg.org/recipes/avocado_recipes.php](https://www.vrg.org/recipes/avocado_recipes.php)
+[18] Veganuary. (n.d.). *Vegan Protein Sources*. Retrieved from [https://veganuary.com/articles/vegan-protein-sources](https://veganuary.com/articles/vegan-protein-sources)
+```
+
+### SEQUENTIAL
+- Query: Most popular Vegan Recipies in sudamerica
+- Success: ✓
+- Latency: 44.17s
+- Iterations: 0
+- Quality Score: 0.850
+- Individual Scores: {'Accuracy': 0.9, 'Completeness': 0.8, 'Relevance': 0.9, 'Clarity': 0.8}
+- Total Tokens: 11,444
+- Estimated Cost: $0.0024
+- Models Used: gemini-2.5-flash, gemini-2.0-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 1855 chars
+- Sources: 4
+
+**Final Draft:**
+```
+## Popular Vegan Recipes in South America
+
+South America boasts a vibrant and evolving vegan culinary scene, with a notable emphasis on plant-based adaptations of traditional dishes. Bean-based recipes, particularly those featuring black beans, are a cornerstone, appearing in popular formats like empanadas and hearty stews.
+
+### Key Trends and Popular Dishes
+
+*   **Bean-Centric Cuisine:** Black beans are a versatile and widely used ingredient in vegan South American cooking. They form the basis for numerous popular dishes, from savory empanadas to nourishing stews that are staples in many households.
+*   **Adaptation of Traditional Recipes:** A significant trend is the successful veganization of classic South American dishes. This involves substituting animal products with plant-based alternatives while retaining the authentic flavors and textures.
+    *   **Brazilian Moqueca:** This traditional seafood stew is frequently reimagined using heart of palm, jackfruit, or mushrooms as a substitute for fish, creating a rich and flavorful vegan version.
+    *   **Desserts and Baked Goods:** Many beloved desserts and sweet breads are being adapted to be vegan, utilizing ingredients like plant-based milks, oils, and egg substitutes.
+*   **Diverse Textures and Flavors:** The popularity of these dishes highlights a regional inclination towards incorporating a wide array of textures and flavors into vegan cooking. This suggests a sophisticated understanding and utilization of diverse plant-based ingredients to create satisfying meals.
+
+In summary, the most popular vegan recipes in South America are characterized by their reliance on ingredients like black beans, the skillful adaptation of traditional dishes such as Moqueca, and a creative approach to textures and flavors, reflecting a dynamic and deeply rooted vegan culinary tradition.
+```
+
+### REFLEXION
+- Query: Most popular Vegan Recipies in sudamerica
+- Success: ✗ Gemini API error: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}
+- Latency: 2.07s
+- Iterations: 0
+- Quality Score: 0.000
+- Individual Scores: {}
+- Total Tokens: 0
+- Estimated Cost: $0.0000
+- Models Used: 
+- Draft Length: 0 chars
+- Sources: 0
+
+**Final Draft:**
+*No draft generated*
+
+## Recommendations
+
+- **Fastest**: reflexion (2.07s)
+- **Most Cost-Effective**: reflexion ($0.0000)
+- **Highest Quality**: sequential (score: 0.850)
+
+================================================================================

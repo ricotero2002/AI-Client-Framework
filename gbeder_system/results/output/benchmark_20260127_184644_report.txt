@@ -1,0 +1,112 @@
+
+================================================================================
+GBEDER MULTI-AGENT SYSTEM - BENCHMARK REPORT
+================================================================================
+
+## Pattern Comparison
+
+Pattern              Latency(s)   Cost($)    Tokens     Tavily     Quality    Complete  
+--------------------------------------------------------------------------------------------
+supervisor           91.98        0.0000     42,449     0          0.000      ✗         
+sequential           37.57        0.0026     12,930     2          0.900      ✓         
+reflexion            33.96        0.0023     11,006     2          0.875      ✓         
+
+## Detailed Results
+
+
+### SUPERVISOR
+- Query: Most popular Vegan Recipies in sudamerica
+- Success: ✗ Gemini API error: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}
+- Latency: 91.98s
+- Iterations: 0
+- Quality Score: 0.000
+- Individual Scores: {}
+- Total Tokens: 42,449
+- Estimated Cost: $0.0000
+- Models Used: gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 0 chars
+- Sources: 0
+
+**Final Draft:**
+*No draft generated*
+
+### SEQUENTIAL
+- Query: Most popular Vegan Recipies in sudamerica
+- Success: ✓
+- Latency: 37.57s
+- Iterations: 0
+- Quality Score: 0.900
+- Individual Scores: {'Accuracy and Completeness': 0.8, 'Relevance': 1.0, 'Clarity and Organization': 0.9}
+- Total Tokens: 12,930
+- Estimated Cost: $0.0026
+- Models Used: gemini-2.5-flash, gemini-2.0-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 2529 chars
+- Sources: 4
+
+**Final Draft:**
+```
+## Popular Vegan Recipes in South America
+
+South American vegan cuisine is characterized by its innovative use of plant-based ingredients to recreate traditional flavors and textures. Bean-based dishes, corn and its derivatives, and versatile ingredients like jackfruit and heart of palm are central to many popular vegan recipes across the continent.
+
+### Key Ingredients and Flavor Profiles
+
+*   **Legumes and Grains:** Beans form the foundation of numerous dishes, providing protein and substance. Rice and other grains are common staples, accompanying a wide array of vegetable preparations.
+*   **Corn Products:** Corn, a staple grain, is featured in various forms, from fresh kernels to masa for tamales and arepas.
+*   **Meat Substitutes:** Ingredients such as jackfruit and heart of palm are frequently employed to mimic the texture of meat in adapted traditional dishes.
+*   **Flavor Enhancers:** Citrus fruits and fresh herbs play a critical role in delivering vibrant and fresh flavor profiles to South American vegan meals.
+
+### Adaptation of Traditional Dishes
+
+A significant trend in South American vegan cooking is the adaptation of classic, non-vegan dishes into plant-based versions. This approach allows for the preservation of cultural culinary heritage while catering to vegan dietary preferences. These adaptations often incorporate a broad spectrum of local vegetables and fruits, ensuring rich and diverse culinary experiences.
+
+### Examples of Popular Vegan Dishes
+
+While specific regional popularity can vary, common themes emerge:
+
+*   **Bean Stews and Soups:** Hearty stews and soups featuring various beans (black beans, lentils, chickpeas) with vegetables and spices are prevalent.
+*   **Corn-Based Preparations:** Dishes like vegan tamales, arepas filled with plant-based ingredients, and corn chowders are popular.
+*   **Jackfruit 'Pulled Pork' or 'Carnitas':** Jackfruit is used to create savory fillings for tacos, empanadas, or as a main component in barbecue-style dishes.
+*   **Heart of Palm 'Ceviche' or 'Tuna Salad':** Heart of palm is often used as a seafood substitute in dishes like ceviche or in salads mimicking tuna salad.
+*   **Vegetable-Heavy Stir-fries and Rice Dishes:** Utilizing the abundant local produce, many vegan meals involve stir-fried vegetables served with rice or other grains.
+
+Overall, South American vegan recipes emphasize fresh, whole ingredients, creative meat and seafood alternatives, and the adaptation of beloved traditional dishes to be entirely plant-based.
+```
+
+### REFLEXION
+- Query: Most popular Vegan Recipies in sudamerica
+- Success: ✓
+- Latency: 33.96s
+- Iterations: 1
+- Quality Score: 0.875
+- Individual Scores: {'Relevance': 0.9, 'Accuracy': 0.9, 'Completeness': 0.8, 'Clarity': 0.9}
+- Total Tokens: 11,006
+- Estimated Cost: $0.0023
+- Models Used: gemini-2.5-flash, gemini-2.0-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 1437 chars
+- Sources: 4
+
+**Final Draft:**
+```
+## Popular Vegan Recipes in South America
+
+South American vegan cuisine is characterized by the adaptation of traditional dishes using plant-based ingredients and readily available vegan substitutes. The analysis highlights several popular food categories and specific dishes that are frequently prepared in vegan variations.
+
+### Key Ingredients and Adaptations
+
+*   **Tacos and Empanadas:** These portable and versatile dishes are very popular and often found in vegan versions. Adaptations typically involve replacing traditional meat fillings with plant-based alternatives such as beans, lentils, or seasoned vegetables.
+*   **Beans and Corn:** Staple ingredients like beans and corn are foundational to many South American vegan recipes. They are used as main components or as hearty fillings and sides.
+*   **Vegan Cheese and Plant-Based Alternatives:** The incorporation of vegan cheese and other plant-based alternatives is a common strategy to mimic the texture and flavor of traditional dairy and meat products, making familiar dishes accessible to vegans.
+
+### Culinary Trends
+
+The overarching trend in South American vegan cooking appears to be the creative modification of existing, beloved recipes. This approach allows for the preservation of cultural culinary heritage while embracing plant-based eating. The focus is on utilizing accessible ingredients and straightforward substitutions to achieve delicious vegan meals.
+```
+
+## Recommendations
+
+- **Fastest**: reflexion (33.96s)
+- **Most Cost-Effective**: supervisor ($0.0000)
+- **Highest Quality**: sequential (score: 0.900)
+
+================================================================================

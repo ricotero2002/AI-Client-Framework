@@ -1,0 +1,74 @@
+================================================================================
+BENCHMARK AGGREGATE ANALYSIS
+================================================================================
+
+Analyzed: 4 complete benchmark runs
+Report Directory: gbeder_system/results/output
+Analysis Date: 2026-01-27 18:36:25
+
+
+================================================================================
+QUERIES ANALYZED
+================================================================================
+
+• Explain Boca Juniors 2025-2026 football transfer market
+  Runs: 3
+
+• What are the most used frameworks for AI engineering in 2026?
+  Runs: 1
+
+
+================================================================================
+PATTERN PERFORMANCE AVERAGES
+================================================================================
+
+Pattern              Runs     Avg Latency     Avg Cost     Avg Tokens   Avg Tavily   Avg Quality  Avg Iters 
+--------------------------------------------------------------------------------------------------------------
+reflexion            4        42.90           $0.0025      13,007       2.0          0.829        1.0       
+supervisor           4        158.22          $0.0102      77,428       3.5          0.806        12.0      
+sequential           4        50.95           $0.0026      14,424       2.0          0.806        0.0       
+
+
+================================================================================
+DETAILED PATTERN STATISTICS
+================================================================================
+
+### REFLEXION
+Runs: 4
+• Latency: avg=42.90s, min=39.06s, max=46.46s
+• Cost: avg=$0.0025, min=$0.0024, max=$0.0026, total=$0.0100
+• Tokens: avg=13,007, min=12,724, max=13,444, total=52,028
+• Tavily Searches: avg=2.0, total=8
+• Quality: avg=0.829, min=0.767, max=0.900
+• Iterations: avg=1.0, min=1, max=1
+
+### SUPERVISOR
+Runs: 4
+• Latency: avg=158.22s, min=136.70s, max=169.38s
+• Cost: avg=$0.0102, min=$0.0087, max=$0.0123, total=$0.0409
+• Tokens: avg=77,428, min=72,407, max=81,727, total=309,714
+• Tavily Searches: avg=3.5, total=14
+• Quality: avg=0.806, min=0.750, max=0.900
+• Iterations: avg=12.0, min=12, max=12
+
+### SEQUENTIAL
+Runs: 4
+• Latency: avg=50.95s, min=31.28s, max=87.37s
+• Cost: avg=$0.0026, min=$0.0024, max=$0.0029, total=$0.0105
+• Tokens: avg=14,424, min=11,752, max=18,924, total=57,696
+• Tavily Searches: avg=2.0, total=8
+• Quality: avg=0.806, min=0.800, max=0.825
+• Iterations: avg=0.0, min=0, max=0
+
+
+================================================================================
+BEST PERFORMERS
+================================================================================
+
+⚡ Fastest (avg latency): reflexion (42.90s)
+💰 Cheapest (avg cost): reflexion ($0.0025)
+🔋 Most Token-Efficient: reflexion (13,007 tokens)
+🔍 Least Tavily Usage: reflexion (2.0 searches)
+⭐ Highest Quality: reflexion (0.829)
+
+================================================================================
