@@ -1,0 +1,62 @@
+
+================================================================================
+GBEDER MULTI-AGENT SYSTEM - BENCHMARK REPORT
+================================================================================
+
+## Pattern Comparison
+
+Pattern              Latency(s)   Cost($)    Tokens     Quality    Complete  
+--------------------------------------------------------------------------------
+supervisor           166.71       0.0094     68,724     0.800      ✓         
+sequential           40.99        0.0028     14,814     0.850      ✓         
+reflexion            41.19        0.0027     13,868     0.800      ✓         
+
+## Detailed Results
+
+
+### SUPERVISOR
+- Query: Explain Boca Juniors 2025-2026 football transfer market
+- Success: ✓
+- Latency: 166.71s
+- Iterations: 10
+- Quality Score: 0.800
+- Individual Scores: {'Accuracy': 0.8, 'Completeness': 0.6, 'Relevance': 0.9, 'Clarity & Structure': 0.9}
+- Total Tokens: 68,724
+- Estimated Cost: $0.0094
+- Models Used: gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 4351 chars
+- Sources: 4
+
+### SEQUENTIAL
+- Query: Explain Boca Juniors 2025-2026 football transfer market
+- Success: ✓
+- Latency: 40.99s
+- Iterations: 0
+- Quality Score: 0.850
+- Individual Scores: {'Accuracy': 0.9, 'Completeness': 0.8, 'Relevance': 0.9, 'Clarity and Structure': 0.8}
+- Total Tokens: 14,814
+- Estimated Cost: $0.0028
+- Models Used: gemini-2.5-flash, gemini-2.0-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 1404 chars
+- Sources: 4
+
+### REFLEXION
+- Query: Explain Boca Juniors 2025-2026 football transfer market
+- Success: ✓
+- Latency: 41.19s
+- Iterations: 1
+- Quality Score: 0.800
+- Individual Scores: {'Accuracy': 0.8, 'Completeness': 0.7, 'Relevance': 0.9, 'Clarity & Organization': 0.8}
+- Total Tokens: 13,868
+- Estimated Cost: $0.0027
+- Models Used: gemini-2.5-flash, gemini-2.0-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 2242 chars
+- Sources: 4
+
+## Recommendations
+
+- **Fastest**: sequential (40.99s)
+- **Most Cost-Effective**: reflexion ($0.0027)
+- **Highest Quality**: sequential (score: 0.850)
+
+================================================================================

@@ -1,0 +1,62 @@
+
+================================================================================
+GBEDER MULTI-AGENT SYSTEM - BENCHMARK REPORT
+================================================================================
+
+## Pattern Comparison
+
+Pattern              Latency(s)   Cost($)    Tokens     Tavily     Quality    Complete  
+--------------------------------------------------------------------------------------------
+supervisor           167.66       0.0087     72,407     2          0.750      ✓         
+sequential           53.09        0.0029     18,924     2          0.800      ✓         
+reflexion            39.06        0.0024     13,008     2          0.767      ✓         
+
+## Detailed Results
+
+
+### SUPERVISOR
+- Query: Explain Boca Juniors 2025-2026 football transfer market
+- Success: ✓
+- Latency: 167.66s
+- Iterations: 12
+- Quality Score: 0.750
+- Individual Scores: {'Accuracy': 0.6, 'Completeness': 0.7, 'Relevance': 0.9, 'Clarity': 0.8}
+- Total Tokens: 72,407
+- Estimated Cost: $0.0087
+- Models Used: gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 3278 chars
+- Sources: 4
+
+### SEQUENTIAL
+- Query: Explain Boca Juniors 2025-2026 football transfer market
+- Success: ✓
+- Latency: 53.09s
+- Iterations: 0
+- Quality Score: 0.800
+- Individual Scores: {'Accuracy': 0.8, 'Completeness': 0.7, 'Relevance': 0.9, 'Clarity and Organization': 0.8}
+- Total Tokens: 18,924
+- Estimated Cost: $0.0029
+- Models Used: gemini-2.5-flash, gemini-2.0-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 1747 chars
+- Sources: 4
+
+### REFLEXION
+- Query: Explain Boca Juniors 2025-2026 football transfer market
+- Success: ✓
+- Latency: 39.06s
+- Iterations: 1
+- Quality Score: 0.767
+- Individual Scores: {'Accuracy': 0.8, 'Completeness': 0.7, 'Clarity and Organization': 0.8}
+- Total Tokens: 13,008
+- Estimated Cost: $0.0024
+- Models Used: gemini-2.5-flash, gemini-2.0-flash, gemini-2.5-flash-lite, gemini-2.0-flash-lite
+- Draft Length: 1745 chars
+- Sources: 4
+
+## Recommendations
+
+- **Fastest**: reflexion (39.06s)
+- **Most Cost-Effective**: reflexion ($0.0024)
+- **Highest Quality**: sequential (score: 0.800)
+
+================================================================================

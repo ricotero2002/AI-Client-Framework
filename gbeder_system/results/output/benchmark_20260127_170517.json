@@ -1,0 +1,101 @@
+[
+  {
+    "pattern_name": "supervisor",
+    "query": "Explain Boca Juniors 2025-2026 football transfer market",
+    "timestamp": "2026-01-27T17:03:45.805626",
+    "success": true,
+    "error": null,
+    "latency_seconds": 166.71,
+    "iterations": 10,
+    "is_complete": true,
+    "scores": {
+      "Accuracy": 0.8,
+      "Completeness": 0.6,
+      "Relevance": 0.9,
+      "Clarity & Structure": 0.9
+    },
+    "avg_score": 0.8,
+    "token_usage": {
+      "gemini-2.0-flash": 37854,
+      "gemini-2.5-flash": 2000,
+      "gemini-2.5-flash-lite": 16568,
+      "gemini-2.0-flash-lite": 12302
+    },
+    "total_tokens": 68724,
+    "estimated_cost_usd": 0.0094,
+    "draft_length": 4351,
+    "num_sources": 4,
+    "models_used": [
+      "gemini-2.0-flash",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
+      "gemini-2.0-flash-lite"
+    ]
+  },
+  {
+    "pattern_name": "sequential",
+    "query": "Explain Boca Juniors 2025-2026 football transfer market",
+    "timestamp": "2026-01-27T17:04:31.623837",
+    "success": true,
+    "error": null,
+    "latency_seconds": 40.99,
+    "iterations": 0,
+    "is_complete": true,
+    "scores": {
+      "Accuracy": 0.9,
+      "Completeness": 0.8,
+      "Relevance": 0.9,
+      "Clarity and Structure": 0.8
+    },
+    "avg_score": 0.85,
+    "token_usage": {
+      "gemini-2.5-flash": 1000,
+      "gemini-2.0-flash": 9144,
+      "gemini-2.5-flash-lite": 1232,
+      "gemini-2.0-flash-lite": 3438
+    },
+    "total_tokens": 14814,
+    "estimated_cost_usd": 0.0028,
+    "draft_length": 1404,
+    "num_sources": 4,
+    "models_used": [
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-2.5-flash-lite",
+      "gemini-2.0-flash-lite"
+    ]
+  },
+  {
+    "pattern_name": "reflexion",
+    "query": "Explain Boca Juniors 2025-2026 football transfer market",
+    "timestamp": "2026-01-27T17:05:17.785608",
+    "success": true,
+    "error": null,
+    "latency_seconds": 41.19,
+    "iterations": 1,
+    "is_complete": true,
+    "scores": {
+      "Accuracy": 0.8,
+      "Completeness": 0.7,
+      "Relevance": 0.9,
+      "Clarity & Organization": 0.8
+    },
+    "avg_score": 0.8,
+    "token_usage": {
+      "gemini-2.5-flash": 1000,
+      "gemini-2.0-flash": 7518,
+      "gemini-2.5-flash-lite": 1514,
+      "gemini-2.0-flash-lite": 3836
+    },
+    "total_tokens": 13868,
+    "estimated_cost_usd": 0.0027,
+    "draft_length": 2242,
+    "num_sources": 4,
+    "models_used": [
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-2.5-flash-lite",
+      "gemini-2.0-flash-lite"
+    ]
+  }
+]

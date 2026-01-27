@@ -36,6 +36,24 @@ class GeminiClient(BaseAIClient):
         
         # Set default model
         self.current_model = Config.get_default_model("gemini")
+        
+        # Model fallback configuration (similar price alternatives)
+        self._model_fallbacks = {
+            # gemini-2.0-flash alternatives (input: 0.10, output: 0.40)
+            "gemini-2.0-flash": ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.0-flash-exp"],
+            
+            # gemini-2.0-flash-lite alternatives (input: 0.075, output: 0.30)
+            "gemini-2.0-flash-lite": ["gemini-2.0-flash-exp", "gemini-2.5-flash-lite", "gemini-2.0-flash"],
+            
+            # gemini-2.5-flash alternatives (input: 0.30, output: 2.50)
+            "gemini-2.5-flash": ["gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash-exp"],
+            
+            # gemini-2.5-flash-lite alternatives (input: 0.10, output: 0.40)
+            "gemini-2.5-flash-lite": ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash-exp"],
+            
+            # gemini-2.0-flash-exp alternatives (FREE)
+            "gemini-2.0-flash-exp": ["gemini-2.0-flash-lite", "gemini-2.5-flash-lite", "gemini-2.0-flash"],
+        }
     
     def select_model(self, model_name: str) -> None:
         """Select the model to use"""
@@ -157,7 +175,78 @@ class GeminiClient(BaseAIClient):
             return response_text, token_usage
             
         except Exception as e:
-            raise Exception(f"Gemini API error: {str(e)}")
+            error_str = str(e)
+            
+            # Check for rate limiting (429) or service unavailable (503) errors
+            if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or 
+                "503" in error_str or "UNAVAILABLE" in error_str or "overloaded" in error_str.lower()):
+                
+                if "503" in error_str or "overloaded" in error_str.lower():
+                    print(f"⚠️  Service overloaded for {self.current_model}. Trying fallback models...")
+                else:
+                    print(f"⚠️  Rate limit hit for {self.current_model}. Trying fallback models...")
+                
+                # Get fallback models for current model
+                fallbacks = self._model_fallbacks.get(self.current_model, [])
+                
+                for fallback_model in fallbacks:
+                    try:
+                        print(f"🔄 Attempting with {fallback_model}...")
+                        
+                        # Temporarily switch model
+                        original_model = self.current_model
+                        self.current_model = fallback_model
+                        
+                        # Retry with fallback model
+                        response = self._client.models.generate_content(
+                            model=self.current_model,
+                            contents=user_content,
+                            config=config
+                        )
+                        
+                        # Success!
+                        print(f"✅ Success with {fallback_model}!")
+                        
+                        # Extract response
+                        response_text = response.text
+                        usage_metadata = response.usage_metadata
+                        
+                        cached_tokens = 0
+                        if hasattr(usage_metadata, 'cached_content_token_count'):
+                            cached_tokens = usage_metadata.cached_content_token_count or 0
+                        
+                        token_usage = TokenUsage(
+                            prompt_tokens=usage_metadata.prompt_token_count,
+                            completion_tokens=usage_metadata.candidates_token_count,
+                            total_tokens=usage_metadata.total_token_count,
+                            cached_tokens=cached_tokens
+                        )
+                        
+                        # Keep the fallback model for future requests
+                        print(f"ℹ️  Switched from {original_model} to {fallback_model} due to availability issues")
+                        
+                        return response_text, token_usage
+                        
+                    except Exception as fallback_error:
+                        # This fallback also failed, try next one
+                        fallback_error_str = str(fallback_error)
+                        if ("429" in fallback_error_str or "RESOURCE_EXHAUSTED" in fallback_error_str or
+                            "503" in fallback_error_str or "UNAVAILABLE" in fallback_error_str or 
+                            "overloaded" in fallback_error_str.lower()):
+                            print(f"❌ {fallback_model} also unavailable")
+                            self.current_model = original_model  # Restore
+                            continue
+                        else:
+                            # Different error, restore and raise
+                            self.current_model = original_model
+                            raise fallback_error
+                
+                # All fallbacks failed
+                print(f"❌ All fallback models exhausted. Original error: {error_str}")
+                raise Exception(f"Gemini API error (all models unavailable): {error_str}")
+            
+            # Not a rate limit or availability error, raise original exception
+            raise Exception(f"Gemini API error: {error_str}")
     
     def count_tokens(self, text: str, model: Optional[str] = None) -> int:
         """Count tokens using Gemini's API"""
