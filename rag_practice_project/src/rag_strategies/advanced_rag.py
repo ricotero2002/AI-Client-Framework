@@ -1,8 +1,8 @@
 """
 Advanced RAG - Con optimización de consultas y re-ranking
 """
-from typing import Dict, Any, List, Optional
-from pydantic import BaseModel
+from typing import Dict, Any, List, Optional, Literal
+from pydantic import BaseModel, Field, field_validator
 from pathlib import Path
 import sys
 import time
@@ -14,6 +14,54 @@ from src.vector_db.chroma_manager import ChromaDBManager
 from src.utils.config_loader import EXPANSION_LLM_PROVIDER, EXPANSION_MODEL
 from sentence_transformers import CrossEncoder
 import numpy as np
+
+class NutritionalFilter(BaseModel):
+    """Filtro para valores nutricionales"""
+    field: Literal["calories", "protein_g", "fat_g", "carbs_g", "sugar_g", "fiber_g", "sodium_mg"] = Field(..., description="Campo nutricional a filtrar")
+    operator: Literal["$gt", "$lt", "$gte", "$lte", "$eq"] = Field(..., description="Operador de comparación")
+    value: float = Field(..., description="Valor numérico para el filtro")
+    
+class QueryOptimization(BaseModel):
+    """Parámetros optimizados de query"""
+    query: str = Field(..., description="Query expandida con sinónimos")
+    user_asked_for: int = Field(..., description="Cantidad exacta que el usuario pidió", ge=1, le=50)
+    n_for_query: int = Field(..., description="Cantidad a recuperar para re-ranking (3x user_asked_for)", ge=3, le=50)
+    nutritional_filters: Optional[list[NutritionalFilter]] = Field(default=None, description="Filtros nutricionales, si se mencionan valores nutricionales")
+    nutritional_filter_operator: Literal["$and", "$or"] = Field(default="$and", description="Operador lógico para combinar múltiples filtros nutricionales")
+    ingredient_filter: Optional[str] = Field(default=None, description="Ingrediente específico a buscar, si se menciona un ingrediente específico")
+    
+    @field_validator('n_for_query')
+    @classmethod
+    def validate_n_for_query(cls, v: int, info) -> int:
+        """Asegurar que n_for_query >= user_asked_for * 3"""
+        user_asked = info.data.get('user_asked_for', 1)
+        min_n = user_asked * 3
+        return max(v, min_n)
+
+    def to_chroma_filters(self) -> tuple:
+        """Convierte a formato ChromaDB"""
+        where_metadata = None
+        where_document = None
+        
+        # Construir where_metadata
+        if self.nutritional_filters:
+            if len(self.nutritional_filters) == 1:
+                f = self.nutritional_filters[0]
+                where_metadata = {f.field: {f.operator: f.value}}
+            else:
+                where_metadata = {
+                    self.nutritional_filter_operator: [
+                        {f.field: {f.operator: f.value}} for f in self.nutritional_filters
+                    ]
+                }
+        
+        # Construir where_document
+        if self.ingredient_filter:
+            where_document = {"$contains": self.ingredient_filter.lower()}
+        
+        return where_metadata, where_document
+
+
 
 class Reranker:
     def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
@@ -63,6 +111,7 @@ class AdvancedRAGStrategy(BaseRAGStrategy):
         self.llm_client = get_llm_client()  # Modelo principal para respuestas
         self.reranker = Reranker("cross-encoder/ms-marco-MiniLM-L-12-v2")
         # Modelo específico para expansión de queries
+        print("[ADVANCED RAG] EXPANSION_MODEL", EXPANSION_MODEL)
         self.expansion_client = get_llm_client(
             provider=EXPANSION_LLM_PROVIDER,
             model=EXPANSION_MODEL
@@ -90,16 +139,11 @@ class AdvancedRAGStrategy(BaseRAGStrategy):
         retrieve_start = time.time()
         
         # Extraer parámetros del structured output
-        optimized_query_text = query_params.get("query", query)
-        n_results = min(query_params.get("n_for_query", self.top_k), self.top_k)
-        user_asked_for = query_params.get("n_for_query", 1)
-        where_metadata = query_params.get("where_metadata", None)
-        where_document = query_params.get("where_document", None)
-        
+        where_metadata, where_document = query_params.to_chroma_filters()
         # Realizar query con todos los parámetros
         results = self.vector_db.query(
-            query_text=optimized_query_text,
-            n_results=n_results,
+            query_text=query_params.query,
+            n_results=query_params.n_for_query,
             where_metadata=where_metadata,
             where_text=where_document
         )
@@ -112,12 +156,11 @@ class AdvancedRAGStrategy(BaseRAGStrategy):
         
         # 3. POST-RETRIEVAL: Re-ranking y filtrado
         rerank_start = time.time()
-        ranked_docs, ranked_meta, ranked_scores = self.reranker.rerank(query, documents, metadatas, user_asked_for)
+        ranked_docs, ranked_meta, ranked_scores = self.reranker.rerank(query, documents, metadatas, query_params.user_asked_for)
         rerank_time = (time.time() - rerank_start) * 1000 
         
         # 4. GENERATE: Generar respuesta con contexto optimizado
         context = self._format_context(ranked_docs, ranked_meta, ranked_scores)
-        
         # System Prompt: Define el rol y las reglas de estilo permanentes
         system_prompt = """Eres un asistente experto en nutrición y cocina vegana/vegetariana. 
 Tu objetivo es ayudar al usuario basándote EXCLUSIVAMENTE en las recetas proporcionadas, que han sido cuidadosamente seleccionadas y re-rankeadas por relevancia.
@@ -129,6 +172,7 @@ REGLAS DE ORO:
 4. CARACTERES: Usa gramática española correcta, incluyendo tildes y la letra ñ.
 5. DATOS NUTRICIONALES: Si la consulta pide características específicas (proteína, calorías, grasa), debes incluir obligatoriamente el valor numérico por porción que aparece en el contexto.
 6. PRIORIZACIÓN: Las recetas están ordenadas por relevancia. Prioriza las primeras en tu respuesta.
+7. RESPUESTA: Siempre contesta en base a las recetas proporcionadas, si no hay ninguna receta que encaje con la búsqueda, di que no la tienes y sugiere una búsqueda externa.
 
 INSTRUCCIONES DE SALIDA:
 - Si encontraste recetas que coincidan, enumera sus nombres traducidos en orden de relevancia.
@@ -183,10 +227,10 @@ PREGUNTA DEL USUARIO:
         return {
             "strategy": self.name,
             "query": query,
-            "optimized_query": optimized_query_text,
+            "optimized_query": query_params.query,
             "query_params": query_params,  # Incluir todos los parámetros de optimización
             "response": response_data.get("response", ""),
-            "context": ranked_docs,
+            "context": context,
             "context_metadata": ranked_meta,
             "relevance_scores": ranked_scores,
             "latency_ms": total_latency,
@@ -212,11 +256,11 @@ PREGUNTA DEL USUARIO:
                 "documentos_scores": ranked_scores,  # Scores después del re-ranking
                 "query_optimization": {
                     "original_query": query,
-                    "optimized_query": optimized_query_text,
+                    "optimized_query": query_params.query,
                     "where_metadata_filter": where_metadata,
                     "where_document_filter": where_document,
-                    "n_results_requested": n_results,
-                    "user_asked_for": user_asked_for
+                    "n_results_requested": query_params.n_for_query,
+                    "user_asked_for": query_params.user_asked_for
                 },
                 "latency_breakdown": {
                     "optimize_ms": optimize_time,
@@ -242,85 +286,50 @@ PREGUNTA DEL USUARIO:
                 }
             }
         }
+        # Función helper para testing (sin decorador @tool)
+    def _optimize_query(self, query: str) -> QueryOptimization:
+        """
+        Implementación de optimización de query.
+        Esta función puede ser llamada directamente para testing.
+        """
+        system_prompt = """Eres un experto en optimización de búsquedas de recetas.
     
-    def _optimize_query(self, query: str) -> Dict[str, Any]:
-        """
-        Optimiza la consulta para mejorar la recuperación
+METADATOS DISPONIBLES: calories, protein_g, fat_g, carbs_g, sugar_g, fiber_g, sodium_mg
+
+REGLAS CRÍTICAS:
+1. **user_asked_for**: 
+   - Si el usuario especifica un número EXACTO (ej: "Dame 3 recetas", "una receta", "2 opciones") → usa ese número
+   - Si hace una pregunta abierta (ej: "¿Qué recetas...?", "¿Cuáles son...?", "Recetas que...") → usa 5 (para mostrar varias opciones)
+   - Si solo dice "recetas" en plural sin número ni pregunta → usa 3
+   - Si dice "receta" en singular → usa 1
+2. **n_for_query**: Calcula automáticamente como user_asked_for * 3 (para re-ranking, mínimo 9)
+3. **nutritional_filters**: Si menciona valores nutricionales, crea filtros con:
+   - field: nombre exacto del campo (ej: "protein_g", NO "protein")
+   - operator: "$gt", "$lt", "$gte", "$lte", "$eq"
+   - value: número extraído
+   - **nutritional_filter_operator**: Si hay más de un filtro, indica si deben cumplirse todos ("$and") o al menos uno ("$or") basándote en conectores como "y" o "o". Por defecto usa "$and".
+4. **ingredient_filter**: Si menciona un ingrediente específico, extráelo (ej: "quinoa") Y escribilo en ingles siempre. quinoa -> quinoa, lentejas -> lentils, garbanzos -> chickpeas, etc.
+5. **query**: Expande con sinónimos, escribilo en ingles (ej: "sopas" → "soups broths consommés")
+
+EJEMPLOS:
+- "Dame 3 recetas con mucha proteína" → user_asked_for=3, n_for_query=9, nutritional_filters=[{"field":"protein_g", "operator":"$gt", "value":15}]
+- "¿Qué recetas tienen más de 15g de proteína?" → user_asked_for=5, n_for_query=15, nutritional_filters=[{"field":"protein_g", "operator":"$gt", "value":15}]
+- "Recetas de quinoa bajas en calorías" → user_asked_for=3, ingredient_filter="quinoa", nutritional_filters=[{"field":"calories", "operator":"$lt", "value":300}]
+- "Dame una receta de sopa" → user_asked_for=1, n_for_query=3, query="soup broth"
+"""
+    
+        expansion_prompt = f'Analiza esta consulta: "{query}"'
         
-        Args:
-            query: Consulta original
-            
-        Returns:
-            Dict: Parámetros optimizados de query (query, where_metadata, where_document, n_for_query, user_asked_for)
-        """
-        # Expandir consulta con términos relacionados
-        system_prompt = f"""Eres un experto en optimización de búsquedas en bases de datos vectoriales Y un experto en ChromaDB.
-Tu objetivo es expandir la consulta del usuario para mejorar la recuperación de documentos.
-
-PARÁMETROS DISPONIBLES:
-- query: La consulta expandida con sinónimos y términos relacionados
-- where_metadata: Filtro JSON para metadatos numéricos (ej: {{"calories": {{"$lt": 400}}, "protein_g": {{"$gt": 10}}}})
-- where_document: Filtro para buscar texto específico en el documento (ej: {{"$contains": "quinoa"}})
-- n_for_query: Cantidad de documentos a recuperar (máximo {self.top_k}), siempre mayor o igual a user_asked_for para poder hacer re-ranking posterior
-- user_asked_for: Cantidad de recetas que el usuario pidió explícitamente
-
-METADATOS DISPONIBLES: calories, protein_g, fat_g, carbs_g, cholesterol, sugar_g, fiber_g, sodium_mg, ingredients_text
-
-REGLAS:
-1. Si el usuario pide características nutricionales específicas, usa where_metadata
-2. Si el usuario pide ingredientes específicos, usa where_document
-3. Si pide más de {self.top_k} recetas, establece n_for_query en {self.top_k}
-4. Si pide menos, puedes pedir hasta {self.top_k} para re-ranking posterior
-5. where_metadata debe ser un dict válido de Python o null
-6. where_document debe ser un dict válido de Python o null"""
-        
-        expansion_prompt = f"""Analiza esta consulta sobre recetas vegetarianas:
-"{query}"
-
-Genera:
-1. Una query expandida con sinónimos y términos relacionados (máximo 2-3 oraciones)
-2. Filtros where_metadata si hay requisitos nutricionales específicos
-3. Filtros where_document si hay ingredientes específicos mencionados
-4. El número apropiado de documentos a recuperar
-
-Ejemplos:
-- "recetas con mucha proteína" → where_metadata: {{"protein_g": {{"$gt": 15}}}}
-- "algo con quinoa" → where_document: {{"$contains": "quinoa"}}
-- "dame 3 recetas de sopas de menos de 200 calorias" Aqui tiene 3 recetas de sopas de menos de 200 calorias ... → where_document: {{"$contains": "sopa"}}, where_metadata: {{"$lt": 200}}, n_for_query: 9, user_asked_for: 3"""
-
-        class QueryExpansion(BaseModel):
-            query: str
-            where_metadata: Optional[Dict[str, Any]] = None
-            where_document: Optional[Dict[str, Any]] = None
-            n_for_query: int = 10
-            user_asked_for: int = 1
-        
-        # Usar el cliente de expansión específico
-        response_data = self.expansion_client.generate(
+        response = self.expansion_client.generate(
             prompt=expansion_prompt,
             system_prompt=system_prompt,
-            max_tokens=300,
-            temperature=0.3,  # Más determinístico para structured output
-            structured_output=QueryExpansion
+            structured_output=QueryOptimization,
+            temperature=0.2
         )
         
-        # El response debería contener el objeto validado
-        # Parsear el JSON response
-        import json
-        try:
-            response_text = response_data.get("response", "{}")
-            parsed_response = json.loads(response_text)
-            return parsed_response
-        except json.JSONDecodeError:
-            # Fallback si no se puede parsear
-            print(f"Warning: No se pudo parsear la respuesta estructurada. Usando query original.")
-            return {
-                "query": query,
-                "where_metadata": None,
-                "where_document": None,
-                "n_for_query": self.top_k,
-                "user_asked_for": 1
-            }
+        # Parsear y validar
+        params = QueryOptimization.model_validate_json(response["response"])
+        return params
     
     def _format_context(self, documents: List[str], metadatas: List[Dict], 
                        scores: List[float]) -> str:
@@ -338,7 +347,10 @@ Ejemplos:
         context_parts = []
         for i, (doc, meta, score) in enumerate(zip(documents, metadatas, scores), 1):
             context_parts.append(
-                f"Receta {i} (Relevancia: {score:.2f}):\n{doc}\n"
+                f"Receta {i} (Relevancia: {score:.2f}):\n{doc}\n{meta}\n"
             )
         
         return "\n".join(context_parts)
+
+
+##-------------------------------------------------------------------------------------------------------------

@@ -4,13 +4,23 @@ Script de setup completo: cargar datos y crear vector database
 from pathlib import Path
 import sys
 
-sys.path.append(str(Path(__file__).parent.parent))
+# Setup paths
+PROJECT_ROOT = Path(__file__).parent.absolute()
+FRAMEWORK_ROOT = PROJECT_ROOT.parent.absolute()
+
+# Add framework to path
+if str(FRAMEWORK_ROOT) not in sys.path:
+    sys.path.insert(0, str(FRAMEWORK_ROOT))
+
+# Add project root to path
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 from src.data.load_dataset import main as load_data
 from src.vector_db.chroma_manager import setup_chroma_db
 from src.vector_db.visualize_db import visualize_rag_query
 import pandas as pd
-from config.config import PROCESSED_DATA_DIR
+from rag_config.config import PROCESSED_DATA_DIR
 
 def main():
     """

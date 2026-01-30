@@ -147,10 +147,10 @@ Responde solo con un número."""
             float: Score de 0 a 1
         """
         # Pásale TODO el contexto que recibió el modelo, no solo los primeros 3
-        context_str = "\n".join(context) 
         # Mejora el prompt para que el evaluador sea más "inteligente"
+        print(context)
         eval_prompt = f"""Eres un auditor de calidad. Compara la respuesta con el contexto.
-        Contexto: {context_str}
+        Contexto: {context}
         Respuesta: {response}
         ¿La respuesta se apoya en el contexto? 
         0: Es un invento total.
