@@ -10,11 +10,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 from rag_practice_project.src.rag_strategies.no_rag import NoRAGStrategy
 from rag_practice_project.src.rag_strategies.naive_rag import NaiveRAGStrategy
 from rag_practice_project.src.rag_strategies.advanced_rag import AdvancedRAGStrategy
-from rag_practice_project.src.rag_strategies.modular_rag import ModularRAGStrategy
 from rag_practice_project.src.rag_strategies.agentic_rag import AgenticRAGStrategy
 from rag_practice_project.src.rag_strategies.graph_rag import GraphRAGStrategy
 from rag_practice_project.src.evaluation.evaluator import ExperimentRunner
-from rag_practice_project.config.config import RESULTS_DIR
+from rag_practice_project.config.config import RESULTS_DIR, PROCESSED_DATA_DIR
 
 # Consultas de prueba
 
@@ -28,7 +27,7 @@ TEST_QUERIES = [
     #"Dame una receta rápida para un desayuno con avena.",
     "Necesito recetas con quinoa que tengan al menos 12g de proteína.",
     #"¿Cómo preparar tacos de carne de res con crema?",
-    #"Dime algunas recetas que combinen frijoles negros y maíz.",
+    "Tengo berenjena y garbanzos, ¿qué receta puedo hacer?",
     "Dame dos opciones de platos que sean picantes."
 ]
 
@@ -42,14 +41,72 @@ def main():
     
     # Inicializar estrategias
     print("\nInicializando estrategias RAG...")
+    
+    # Cargar Knowledge Graph si se va a usar Graph RAG
+    graph_index = None
+    graph_retriever = None
+    
+    # Check if GraphRAGStrategy is needed
+    use_graph_rag = True  # Set to False to skip graph loading
+    
+    if use_graph_rag:
+        print("\n[Graph RAG] Cargando Knowledge Graph...")
+        try:
+            from src.graph_db.neo4j_manager import Neo4jManager
+            from src.graph_db.graph_builder import GraphBuilder
+            from src.graph_db.graph_retriever import GraphRetriever
+            import pandas as pd
+            
+            # Conectar a Neo4j
+            neo4j_manager = Neo4jManager()
+            stats = neo4j_manager.get_statistics()
+            
+            if stats["node_count"] > 0:
+                print(f"✓ Grafo encontrado: {stats['node_count']} nodos, {stats['relationship_count']} relaciones")
+                
+                # Cargar dataset
+                df = pd.read_parquet(PROCESSED_DATA_DIR / "vegan_recipes_processed.parquet")
+                
+                # Reconstruir índice
+                builder = GraphBuilder(
+                    neo4j_manager=neo4j_manager,
+                    llm_model="gemini-2.5-pro",
+                    show_progress=False
+                )
+                
+                documents = builder.prepare_documents(df)
+                print("⚠️  Cargando índice existente (sin reconstruir)...")
+                graph_index = builder.load_existing_index()
+                
+                # Initialize GraphRetriever with llm_provider from config
+                from rag_config.config import EXPANSION_MODEL
+                graph_retriever = GraphRetriever(
+                    graph_index, 
+                    llm_model=EXPANSION_MODEL
+                )
+                print("✓ Graph RAG listo")
+            else:
+                print("⚠️  No hay Knowledge Graph. GraphRAGStrategy no estará disponible.")
+                use_graph_rag = False
+        except Exception as e:
+            print(f"⚠️  Error cargando grafo: {e}")
+            print("   GraphRAGStrategy no estará disponible")
+            use_graph_rag = False
+    
     strategies = [
         #NoRAGStrategy(),
         #NaiveRAGStrategy(top_k=3),
-        AdvancedRAGStrategy(top_k=20),
-        #ModularRAGStrategy(top_k=5),
-        #AgenticRAGStrategy(max_iterations=3),
-        #GraphRAGStrategy(top_k=5)
+        #AdvancedRAGStrategy(top_k=20),
+        #AgenticRAGStrategy(max_iterations=15),
     ]
+    
+    # Add Graph RAG if loaded
+    if use_graph_rag and graph_retriever is not None:
+        strategies.append(GraphRAGStrategy(
+            top_k=10, 
+            graph_index=graph_index,
+            graph_retriever=graph_retriever
+        ))
     
     print(f"✓ {len(strategies)} estrategias inicializadas")
     

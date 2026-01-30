@@ -1,0 +1,24 @@
+# Graph RAG Dependencies
+# Install with: pip install -r requirements_graph.txt
+
+# LlamaIndex Core
+llama-index>=0.10.0
+llama-index-core>=0.10.0
+
+# Graph Store Integration - Neo4j
+llama-index-graph-stores-neo4j>=0.2.0
+neo4j>=5.14.0
+
+# Vector Store - ChromaDB (already in main requirements)
+llama-index-vector-stores-chroma>=0.1.0
+
+# LLM Integration - Ollama for free local models
+llama-index-llms-ollama>=0.1.0
+llama-index-llms-gemini>=0.1.0
+
+# Embeddings - HuggingFace (using existing sentence-transformers)
+llama-index-embeddings-huggingface>=0.1.0
+
+# Additional utilities
+networkx>=3.0  # For graph visualization
+nest-asyncio

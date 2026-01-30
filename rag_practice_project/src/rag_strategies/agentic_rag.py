@@ -1,219 +1,154 @@
 """
-Agentic RAG - RAG con agentes autónomos que toman decisiones
+Agentic RAG - Wrapper for LangGraph Agent in Experiments
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
 from pathlib import Path
 import sys
 import time
+import uuid
 import json
+import importlib.util
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.rag_strategies.base_strategy import BaseRAGStrategy
-from src.utils.llm_client import get_llm_client
-from src.vector_db.chroma_manager import ChromaDBManager
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+
+# Load Agent Module dynamically
+agentic_rag_dir = Path(__file__).parent / "agentic_rag"
+if str(agentic_rag_dir) not in sys.path:
+    sys.path.insert(0, str(agentic_rag_dir))
+
+agentic_rag_path = agentic_rag_dir / "agente.py"
+spec = importlib.util.spec_from_file_location("agentic_rag.agente", agentic_rag_path)
+agente_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(agente_module)
+
 
 class AgenticRAGStrategy(BaseRAGStrategy):
     """
-    RAG con agentes que deciden:
-    - Si necesitan recuperar información
-    - Cuántos documentos recuperar
-    - Si necesitan refinar la búsqueda
-    - Cómo estructurar la respuesta
+    Agentic RAG wrapper that collects full execution traces and accumulates context.
     """
     
-    def __init__(self, max_iterations: int = 3):
+    def __init__(self, max_iterations: int = 15):
         super().__init__("Agentic RAG")
-        self.llm_client = get_llm_client()
-        self.vector_db = ChromaDBManager()
         self.max_iterations = max_iterations
-    
+        self.app = agente_module.app
+        
     def generate_response(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        Genera respuesta usando agentes autónomos
+        start_time = time.time()
+        thread_id = f"experiment_{uuid.uuid4().hex[:8]}"
+        config = {"configurable": {"thread_id": thread_id}}
         
-        Args:
-            query: Consulta del usuario
-            
-        Returns:
-            Dict con respuesta y métricas
-        """
-        total_start = time.time()
+        inputs = {"messages": [HumanMessage(content=query)]}
         
-        # Historial de acciones del agente
-        agent_actions = []
-        retrieved_docs = []
+        # --- DATA COLLECTION CONTAINERS ---
+        execution_trace = []
+        all_retrieved_documents = [] 
+        seen_doc_ids = set() # To avoid duplicates in the context list
         
-        # 1. Agente decide si necesita recuperar información
-        decision_start = time.time()
-        needs_retrieval = self._decide_retrieval_need(query)
-        decision_time = (time.time() - decision_start) * 1000
-        
-        agent_actions.append({
-            "action": "decide_retrieval",
-            "decision": needs_retrieval,
-            "time_ms": decision_time
-        })
-        
-        retrieve_time = 0
-        refine_time = 0
-        
-        if needs_retrieval:
-            # 2. Agente decide cuántos documentos recuperar
-            num_docs = self._decide_num_documents(query)
-            agent_actions.append({
-                "action": "decide_num_docs",
-                "num_docs": num_docs
-            })
-            
-            # 3. Recuperar documentos
-            retrieve_start = time.time()
-            results = self.vector_db.query(query, n_results=num_docs)
-            retrieve_time = (time.time() - retrieve_start) * 1000
-            
-            documents = results.get("documents", [[]])[0]
-            metadatas = results.get("metadatas", [[]])[0]
-            distances = results.get("distances", [[]])[0]
-            
-            retrieved_docs = documents
-            
-            agent_actions.append({
-                "action": "retrieve",
-                "num_retrieved": len(documents),
-                "time_ms": retrieve_time
-            })
-            
-            # 4. Agente decide si necesita refinar la búsqueda
-            refine_start = time.time()
-            needs_refinement = self._decide_refinement(query, documents)
-            refine_time = (time.time() - refine_start) * 1000
-            
-            if needs_refinement:
-                # Refinar consulta y buscar de nuevo
-                refined_query = self._refine_query(query, documents)
-                results = self.vector_db.query(refined_query, n_results=num_docs)
-                documents = results.get("documents", [[]])[0]
-                metadatas = results.get("metadatas", [[]])[0]
-                
-                agent_actions.append({
-                    "action": "refine_search",
-                    "refined_query": refined_query,
-                    "time_ms": refine_time
-                })
-        
-        # 5. Generar respuesta
-        if needs_retrieval and retrieved_docs:
-            context = self._format_context(retrieved_docs)
-            prompt = f"""Contexto de recetas:
-{context}
-
-Pregunta: {query}
-
-Responde basándote en el contexto."""
-        else:
-            prompt = query
-        
-        system_prompt = """Eres un asistente experto en recetas vegetarianas y veganas.
-Responde de manera clara, concisa y útil."""
-        
-        response_data, generation_time = self._measure_latency(
-            self.llm_client.generate,
-            prompt=prompt,
-            system_prompt=system_prompt
-        )
-        
-        # Calcular latencia total
-        total_latency = (time.time() - total_start) * 1000
-        
-        # Extraer tokens
-        input_tokens = response_data.get("usage", {}).get("prompt_tokens", 0)
-        output_tokens = response_data.get("usage", {}).get("completion_tokens", 0)
-        
-        # Registrar métricas
-        self._track_metrics(total_latency, input_tokens, output_tokens)
-        
-        return {
-            "strategy": self.name,
-            "query": query,
-            "response": response_data.get("response", ""),
-            "context": retrieved_docs if needs_retrieval else None,
-            "agent_actions": agent_actions,
-            "latency_ms": total_latency,
-            "generation_latency_ms": generation_time,
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": input_tokens + output_tokens,
-            "model": response_data.get("model", self.llm_client.model),
-            "provider": response_data.get("provider", self.llm_client.provider),
-            "agent_decision_model": self.llm_client.model  # Modelo usado para decisiones del agente
-        }
-    
-    def _decide_retrieval_need(self, query: str) -> bool:
-        """
-        Agente decide si necesita recuperar información
-        """
-        decision_prompt = f"""Analiza esta consulta: "{query}"
-
-¿Necesitas buscar recetas específicas para responder? 
-Responde solo "SÍ" o "NO"."""
-        
-        response = self.llm_client.generate(
-            prompt=decision_prompt,
-            system_prompt="Eres un agente que decide si necesita información adicional.",
-            max_tokens=10,
-            temperature=0.1
-        )
-        
-        answer = response.get("response", "").strip().upper()
-        return "SÍ" in answer or "SI" in answer or "YES" in answer
-    
-    def _decide_num_documents(self, query: str) -> int:
-        """
-        Agente decide cuántos documentos recuperar
-        """
-        decision_prompt = f"""Para esta consulta: "{query}"
-
-¿Cuántas recetas deberías recuperar? (entre 3 y 10)
-Responde solo con un número."""
-        
-        response = self.llm_client.generate(
-            prompt=decision_prompt,
-            system_prompt="Decides cuántos documentos recuperar.",
-            max_tokens=5,
-            temperature=0.1
-        )
-        
+        iteration = 0
         try:
-            num = int(response.get("response", "5").strip())
-            return max(3, min(10, num))  # Entre 3 y 10
-        except:
-            return 5  # Default
-    
-    def _decide_refinement(self, query: str, documents: List[str]) -> bool:
-        """
-        Agente decide si necesita refinar la búsqueda
-        """
-        # Simplificado: refinar si los documentos parecen poco relevantes
-        if len(documents) < 3:
-            return True
-        return False
-    
-    def _refine_query(self, query: str, documents: List[str]) -> str:
-        """
-        Refina la consulta basándose en resultados previos
-        """
-        refine_prompt = f"""Consulta original: "{query}"
+            # 1. Run the Graph
+            for event in self.app.stream(inputs, config=config):
+                iteration += 1
+                if iteration >= self.max_iterations:
+                    break
+            
+            # 2. Extract Final State
+            snapshot = self.app.get_state(config)
+            messages = snapshot.values.get("messages", [])
+            final_response = ""
 
-Los resultados no fueron muy relevantes. Reformula la consulta para mejorar la búsqueda.
-Solo devuelve la consulta refinada."""
-        
-        response = self.llm_client.generate(
-            prompt=refine_prompt,
-            system_prompt="Refinas consultas de búsqueda.",
-            max_tokens=50
-        )
-        
-        return response.get("response", query).strip()
-    
-    def _format_context(self, documents: List[str]) -> str:
-        """Formatea contexto"""
-        return "\n\n".join([f"Receta {i+1}:\n{doc}" for i, doc in enumerate(documents)])
+            # 3. Process History to build Trace & Context
+            for i, msg in enumerate(messages):
+                step_data = {
+                    "step": i, 
+                    "role": "unknown", 
+                    "content": str(msg.content)[:1000] # Truncate long content for trace
+                }
+
+                if isinstance(msg, HumanMessage):
+                    step_data["role"] = "user"
+
+                elif isinstance(msg, AIMessage):
+                    step_data["role"] = "agent"
+                    # Check for tool calls
+                    if msg.additional_kwargs.get("tool_calls"):
+                        step_data["tool_calls"] = []
+                        for tc in msg.additional_kwargs["tool_calls"]:
+                            step_data["tool_calls"].append({
+                                "name": tc["function"]["name"],
+                                "args": tc["function"]["arguments"]
+                            })
+                    else:
+                        # If AI message has no tool calls, it's likely the answer
+                        if msg.content.strip():
+                            final_response = msg.content
+
+                elif isinstance(msg, ToolMessage):
+                    step_data["role"] = "tool"
+                    step_data["tool_name"] = msg.name
+                    
+                    # Try to parse tool output to get documents
+                    try:
+                        output_json = json.loads(msg.content)
+                        step_data["output_json"] = output_json # Save full output in trace if needed
+                        
+                        # -- CAPTURE DOCUMENTS --
+                        # Works for both 'retrieve_documents' and 'rerank_documents' 
+                        # as long as they return a "documents" list
+                        if "documents" in output_json and isinstance(output_json["documents"], list):
+                            docs = output_json["documents"]
+                            # Also try to get metadata if available
+                            metas = output_json.get("metadatas", [{} for _ in docs])
+                            
+                            for doc_text, doc_meta in zip(docs, metas):
+                                # Create a unique ID for the doc to prevent duplicates
+                                # Use ID if available, else hash the text
+                                doc_id = doc_meta.get("id", hash(doc_text))
+                                
+                                if doc_id not in seen_doc_ids:
+                                    all_retrieved_documents.append(doc_text)
+                                    seen_doc_ids.add(doc_id)
+                                    
+                    except:
+                        pass
+
+                execution_trace.append(step_data)
+
+            # 4. Metrics & Return
+            total_latency = (time.time() - start_time) * 1000
+            input_tokens = len(query) // 4
+            output_tokens = len(final_response) // 4
+            
+            # Fallback if empty response
+            if not final_response:
+                final_response = "Error: Agent did not produce a final text response."
+
+            return {
+                "strategy": self.name,
+                "query": query,
+                "response": final_response,
+                "context": all_retrieved_documents, # Contains ALL docs from ALL steps
+                "latency_ms": total_latency,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": input_tokens + output_tokens,
+                "model": agente_module.MODEL,
+                "extra_info": {
+                    "thread_id": thread_id,
+                    "iterations": iteration,
+                    "doc_count": len(all_retrieved_documents),
+                    "execution_trace": execution_trace
+                }
+            }
+
+        except Exception as e:
+            return {
+                "strategy": self.name,
+                "query": query,
+                "response": f"Critical Error in Agent: {str(e)}",
+                "error": str(e),
+                "context": [],
+                "latency_ms": (time.time() - start_time) * 1000
+            }
