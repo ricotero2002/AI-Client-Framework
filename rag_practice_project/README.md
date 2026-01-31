@@ -1,6 +1,7 @@
 # RAG Practice Project - Vegetarian Recipes 🥗
 
 Este proyecto implementa y compara 6 estrategias diferentes de RAG (Retrieval-Augmented Generation) utilizando un dataset de recetas vegetarianas. El objetivo es analizar el trade-off entre **calidad de respuesta** y **latencia/costo**.
+La evaluacion se realizo mediante el uso de DeepEval.
 
 ## 📊 Resumen Ejecutivo de Resultados
 
