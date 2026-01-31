@@ -5,6 +5,7 @@ Maneja la conexión a Neo4j Aura y proporciona utilidades para
 interactuar con el grafo de conocimiento.
 """
 import sys
+import time
 from pathlib import Path
 
 # Setup paths para que funcione ejecutando desde cualquier lugar
@@ -48,6 +49,7 @@ class Neo4jManager:
         self.username = username or NEO4J_USERNAME
         self.password = password or NEO4J_PASSWORD
         self.database = database or NEO4J_DATABASE
+        
         # Validar credenciales
         if not self.password:
             raise ValueError(
@@ -60,12 +62,29 @@ class Neo4jManager:
     
     @property
     def driver(self):
-        """Lazy loading del driver de Neo4j"""
+        """Lazy loading del driver de Neo4j con configuración robusta para Aura"""
         if self._driver is None:
+            # Configuración optimizada para Neo4j Aura (cloud)
+            # Previene "defunct connection" errors y timeouts
             self._driver = GraphDatabase.driver(
                 self.uri,
-                auth=(self.username, self.password)
+                auth=(self.username, self.password),
+                
+                # Connection timeout: máximo tiempo para establecer conexión inicial
+                connection_timeout=30.0,  # 30 segundos
+                
+                # Max connection lifetime: cuánto tiempo mantener conexión abierta
+                max_connection_lifetime=3600,  # 1 hora
+                
+                # Max connection pool size: cuántas conexiones mantener en pool
+                max_connection_pool_size=50,  # Reducido para Aura
+                
+                # Connection acquisition timeout: tiempo esperando conexión del pool
+                connection_acquisition_timeout=60.0  # 60 segundos
+                
+                # NOTA: NO usamos encrypted=True porque neo4j+s:// ya indica encriptación
             )
+            print(f"✓ Driver Neo4j inicializado con timeouts robustos")
         return self._driver
     
     @property
@@ -158,25 +177,64 @@ class Neo4jManager:
         except Exception as e:
             print(f"Error limpiando base de datos: {e}")
     
-    def execute_query(self, query: str, parameters: dict = None):
+    def execute_query(self, query: str, parameters: dict = None, max_retries: int = 3):
         """
-        Ejecuta una query Cypher y retorna los resultados
+        Ejecuta una query Cypher con retry logic para manejar errores transitorios
         
         Args:
             query: Query Cypher a ejecutar
             parameters: Parámetros opcionales para la query
+            max_retries: Número máximo de reintentos
             
         Returns:
             Lista de registros (dicts) con los resultados
         """
-        try:
-            with self.driver.session(database=self.database) as session:
-                result = session.run(query, parameters or {})
-                # Convertir records a dicts
-                return [record.data() for record in result]
-        except Exception as e:
-            print(f"Error ejecutando query: {e}")
-            raise
+        last_exception = None
+        
+        for attempt in range(max_retries):
+            try:
+                with self.driver.session(database=self.database) as session:
+                    result = session.run(query, parameters or {})
+                    # Convertir records a dicts
+                    return [record.data() for record in result]
+                    
+            except Exception as e:
+                last_exception = e
+                error_str = str(e).lower()
+                
+                # Detectar errores de conexión que ameritan retry
+                is_connection_error = any(
+                    keyword in error_str 
+                    for keyword in ['defunct', 'timeout', 'connection', 'network', 'no data']
+                )
+                
+                if is_connection_error and attempt < max_retries - 1:
+                    # Exponential backoff: 0.5s, 1s, 2s
+                    wait_time = (2 ** attempt) * 0.5
+                    print(f"⚠️ Error de conexión Neo4j (intento {attempt+1}/{max_retries})")
+                    print(f"   Reintentando en {wait_time}s...")
+                    time.sleep(wait_time)
+                    
+                    # Si la conexión está "defunct", recrear driver
+                    if 'defunct' in error_str or 'no data' in error_str:
+                        print("   Recreando driver Neo4j...")
+                        try:
+                            if self._driver:
+                                self._driver.close()
+                        except:
+                            pass
+                        self._driver = None  # Forzar recreación en próximo acceso
+                    continue
+                else:
+                    # Si no es error de conexión o se agotaron reintentos
+                    if not is_connection_error:
+                        print(f"Error ejecutando query: {e}")
+                    raise
+        
+        # Si llegamos aquí, fallaron todos los reintentos
+        print(f"❌ Query falló después de {max_retries} intentos")
+        if last_exception:
+            raise last_exception
     
     def close(self):
         """Cierra la conexión a Neo4j"""

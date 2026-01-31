@@ -36,9 +36,10 @@ data/chroma_db/
 *.parquet
 
 # Results
-results/*.png
-results/*.html
+
 results/*.csv
+results/*.json
+
 
 # Jupyter
 .ipynb_checkpoints/

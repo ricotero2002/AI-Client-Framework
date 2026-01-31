@@ -13,8 +13,13 @@ sys.path.insert(0, str(parent_dir))
 from client_factory import create_client
 from base_client import BaseAIClient, TokenUsage
 
-# Importar configuración del proyecto RAG
-from src.utils.config_loader import DEFAULT_LLM_PROVIDER, DEFAULT_MODEL
+# Importar configuración del proyecto RAG - usar import relativo al proyecto
+import sys
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from rag_practice_project.src.utils.config_loader import DEFAULT_LLM_PROVIDER, DEFAULT_MODEL
 
 class LLMClientWrapper:
     """
@@ -46,14 +51,21 @@ class LLMClientWrapper:
         Args:
             prompt: Prompt del usuario
             system_prompt: Prompt del sistema (opcional)
+            few_shot_examples: Ejemplos few-shot (opcional)
             max_tokens: Máximo de tokens a generar
-            temperature: Temperatura de generación
+            temperature: Temperatura de generación (0.0 a 1.0)
+            structured_output: Schema Pydantic para output estructurado
             
         Returns:
             Dict con respuesta y metadatos
         """
         # Import Prompt class
         from prompt import Prompt
+        
+        # IMPORTANTE: Gemini tiene bug con temperature=0.0 exacto
+        # Si recibimos 0.0, lo cambiamos a 0.01 para evitar respuestas None
+        if temperature == 0.0:
+            temperature = 0.01
         
         # Configurar parámetros de generación
         self.client.set_temperature(temperature)
@@ -70,11 +82,24 @@ class LLMClientWrapper:
         if few_shot_examples:
             for example in few_shot_examples:
                 prompt_obj.add_few_shot_example(example["query"], example["response"])
+        
         if structured_output:
             prompt_obj.set_output_schema(structured_output)
         
         # Obtener respuesta pasando el objeto Prompt
-        response_text, usage = self.client.get_response(prompt_obj)
+        try:
+            response_text, usage = self.client.get_response(prompt_obj)
+            
+            # Validar que la respuesta no sea None
+            if response_text is None:
+                print(f"⚠️ [LLM_CLIENT] get_response retornó None (Provider: {self.provider}, Model: {self.model}, Temp: {temperature})")
+                response_text = ""  # Fallback a string vacío
+                
+        except Exception as e:
+            print(f"❌ [LLM_CLIENT] Error en get_response: {e}")
+            # Crear usage vacío y respuesta vacía
+            response_text = ""
+            usage = TokenUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
         
         # Resetear configuración
         self.client.reset_generation_config()

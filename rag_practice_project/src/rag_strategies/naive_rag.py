@@ -104,6 +104,7 @@ PREGUNTA DEL USUARIO:
         # Registrar métricas
         self._track_metrics(total_latency, input_tokens, output_tokens)
         
+        print(response_data.get("response", ""))
         return {
             "strategy": self.name,
             "query": query,
