@@ -277,64 +277,63 @@ class Config:
     
     
     GEMINI_PRICING = {
-        # Gemini 3 Series
+        # Gemini 3 Series (Premium, contexto largo >200k aumenta precio)
         "gemini-3-pro-preview": {
             "input": 2.0,
             "output": 12.0,
+            "input_long": 4.0,  # >200k tokens
+            "output_long": 18.0,
             "cached_input": 0.5
         },
+        "gemini-3-flash-preview": {
+            "input": 0.50,
+            "output": 3.0,
+            "cached_input": 0.125
+        },
         
-        # Gemini 2.5 Series
+        # Gemini 2.5 Series (contexto largo >200k aumenta precio)
         "gemini-2.5-pro": {
             "input": 1.25,
             "output": 10.0,
-            "cached_input": 0.3125
-        },
-        "gemini-2.5-pro-preview": {
-            "input": 1.25,
-            "output": 10.0,
+            "input_long": 2.50,  # >200k tokens
+            "output_long": 15.0,
             "cached_input": 0.3125
         },
         "gemini-2.5-flash": {
-            "input": 0.30,
-            "output": 2.50,
-            "cached_input": 0.075
+            "input": 0.15,
+            "output": 0.60,
+            "cached_input": 0.0375
         },
         "gemini-2.5-flash-lite": {
             "input": 0.10,
             "output": 0.40,
             "cached_input": 0.025
         },
-        "gemini-2.5-flash-preview-05-20": {
-            "input": 0.15,
-            "output": 0.60,
-            "cached_input": 0.0375
-        },
         
-        # Gemini 2.0 Series
+        # Gemini 2.0 Series (Modelos de producción estables)
         "gemini-2.0-flash": {
             "input": 0.10,
             "output": 0.40,
             "cached_input": 0.025
         },
-        "gemini-2.0-flash-lite": {
-            "input": 0.075,
-            "output": 0.30,
-            "cached_input": 0.01875
+        "gemini-2.0-flash-001": {  # Versión fija
+            "input":0.10,
+            "output": 0.40,
+            "cached_input": 0.025
         },
-        "gemini-2.0-flash-exp": {
-            "input": 0.0,  # Free tier experimental
-            "output": 0.0,
-            "cached_input": 0.0
+        "gemini-2.0-flash-lite": {
+            "input": 0.08,
+            "output": 0.30,
+            "cached_input": 0.02
+        },
+        "gemini-2.0-flash-lite-001": {  # Versión fija
+            "input": 0.08,
+            "output": 0.30,
+            "cached_input": 0.02
         },
         
-        # Gemini 1.5 Series
+        # Gemini 1.5 Series (Legacy pero estables)
         "gemini-1.5-pro": {
-            "input": 1.25,
-            "output": 5.0,
-            "cached_input": 0.3125
-        },
-        "gemini-1.5-pro-latest": {
             "input": 1.25,
             "output": 5.0,
             "cached_input": 0.3125
@@ -344,29 +343,45 @@ class Config:
             "output": 0.30,
             "cached_input": 0.01875
         },
-        "gemini-1.5-flash-latest": {
-            "input": 0.075,
-            "output": 0.30,
-            "cached_input": 0.01875
-        },
         "gemini-1.5-flash-8b": {
             "input": 0.0375,
             "output": 0.15,
             "cached_input": 0.009375
         },
-        "gemini-1.5-flash-8b-latest": {
-            "input": 0.0375,
-            "output": 0.15,
-            "cached_input": 0.009375
+        
+        # Alias/Latest (apuntan a versiones específicas, precios pueden variar)
+        "gemini-flash-latest": {  # Actualmente apunta a 2.5-flash
+            "input": 0.15,
+            "output": 0.60,
+            "cached_input": 0.0375
+        },
+        "gemini-flash-lite-latest": {  # Apunta a 2.0-flash-lite
+            "input": 0.08,
+            "output": 0.30,
+            "cached_input": 0.02
+        },
+        "gemini-pro-latest": {  # Apunta a 2.5-pro
+            "input": 1.25,
+            "output": 10.0,
+            "cached_input": 0.3125
         },
         
-        # Legacy/Preview
-        "gemini-3-flash-preview": {
-            "input": 0.0,  # Preview/experimental
+        # Experimental/Preview (puede tener rate limits agresivos)
+        "gemini-exp-1206": {
+            "input": 0.0,  # Experimental, puede ser gratis o tener límites
             "output": 0.0,
             "cached_input": 0.0
-        }
+        },
+        
+        # Gemma Series (Modelos abiertos, generalmente sin costo por tokens en tier gratuito)
+        "gemma-3-1b-it": {"input": 0.0, "output": 0.0, "cached_input": 0.0},
+        "gemma-3-4b-it": {"input": 0.0, "output": 0.0, "cached_input": 0.0},
+        "gemma-3-12b-it": {"input": 0.0, "output": 0.0, "cached_input": 0.0},
+        "gemma-3-27b-it": {"input": 0.0, "output": 0.0, "cached_input": 0.0},
+        "gemma-3n-e4b-it": {"input": 0.0, "output": 0.0, "cached_input": 0.0},
+        "gemma-3n-e2b-it": {"input": 0.0, "output": 0.0, "cached_input": 0.0}
     }
+    
     
     # Default models
     DEFAULT_OPENAI_MODEL = "gpt-5-nano"

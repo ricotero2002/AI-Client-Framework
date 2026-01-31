@@ -153,7 +153,6 @@ class AdvancedRAGStrategy(BaseRAGStrategy):
         documents = results.get("documents", [[]])[0]
         metadatas = results.get("metadatas", [[]])[0]
         distances = results.get("distances", [[]])[0]
-        
         # 3. POST-RETRIEVAL: Re-ranking y filtrado
         rerank_start = time.time()
         ranked_docs, ranked_meta, ranked_scores = self.reranker.rerank(query, documents, metadatas, query_params.user_asked_for)
@@ -327,9 +326,20 @@ EJEMPLOS:
             temperature=0.2
         )
         
-        # Parsear y validar
-        params = QueryOptimization.model_validate_json(response["response"])
-        return params
+        # Parsear y validar con manejo robusto de errores
+        try:
+            params = QueryOptimization.model_validate_json(response["response"])
+            return params
+        except Exception as e:
+            print(f"⚠️ Error parsing query optimization (JSON truncado): {e}")
+            print(f"   Usando parámetros seguros por defecto")
+            
+            # Fallback: retornar parámetros seguros
+            return QueryOptimization(
+                query=query,  # Usar query original
+                user_asked_for=3,
+                n_for_query=9
+            )
     
     def _format_context(self, documents: List[str], metadatas: List[Dict], 
                        scores: List[float]) -> str:

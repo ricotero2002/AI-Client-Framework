@@ -37,23 +37,41 @@ class GeminiClient(BaseAIClient):
         # Set default model
         self.current_model = Config.get_default_model("gemini")
         
-        # Model fallback configuration (similar price alternatives)
-        self._model_fallbacks = {
-            # gemini-2.0-flash alternatives (input: 0.10, output: 0.40)
-            "gemini-2.0-flash": ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.0-flash-exp"],
+        # Construir fallbacks dinámicos basados en precios
+        self._model_fallbacks = self._build_model_fallbacks()
+    
+    def _build_model_fallbacks(self) -> Dict[str, List[str]]:
+        """
+        Construye fallbacks inteligentes basados en precios.
+        Para cada modelo, sugiere alternativas ordenadas por cercanía de precio.
+        """
+        fallbacks = {}
+        all_models = list(Config.GEMINI_PRICING.keys())
+        
+        for model in all_models:
+            pricing = Config.GEMINI_PRICING.get(model, {})
+            base_output_cost = pricing.get('output', 0)
             
-            # gemini-2.0-flash-lite alternatives (input: 0.075, output: 0.30)
-            "gemini-2.0-flash-lite": ["gemini-2.0-flash-exp", "gemini-2.5-flash-lite", "gemini-2.0-flash"],
+            # Modelos alternativos ordenados por cercanía de precio de salida
+            alternatives = []
+            for alt_model in all_models:
+                if alt_model == model:
+                    continue
+                
+                alt_pricing = Config.GEMINI_PRICING.get(alt_model, {})
+                alt_output_cost = alt_pricing.get('output', 0)
+                
+                # Calcular diferencia de precio
+                price_diff = abs(alt_output_cost - base_output_cost)
+                alternatives.append((alt_model, price_diff))
             
-            # gemini-2.5-flash alternatives (input: 0.30, output: 2.50)
-            "gemini-2.5-flash": ["gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash-exp"],
+            # Ordenar por cercanía de precio (menor diferencia primero)
+            alternatives.sort(key=lambda x: x[1])
             
-            # gemini-2.5-flash-lite alternatives (input: 0.10, output: 0.40)
-            "gemini-2.5-flash-lite": ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash-exp"],
-            
-            # gemini-2.0-flash-exp alternatives (FREE)
-            "gemini-2.0-flash-exp": ["gemini-2.0-flash-lite", "gemini-2.5-flash-lite", "gemini-2.0-flash"],
-        }
+            # Top 5 alternativas
+            fallbacks[model] = [alt[0] for alt in alternatives[:5]]
+        
+        return fallbacks
     
     def select_model(self, model_name: str) -> None:
         """Select the model to use"""
@@ -153,9 +171,19 @@ class GeminiClient(BaseAIClient):
                 contents=user_content,
                 config=config
             )
-            
-            # Extract response text
-            response_text = response.text
+            response_text = ""
+            # Extracción segura de texto
+            try:
+                # El modelo Pro puede devolver múltiples 'candidates' o ninguno si hay bloqueo
+                if response.candidates and response.candidates[0].content.parts:
+                    response_text = response.text
+                else:
+                    print(f"⚠️ El modelo {self.current_model} no generó contenido (posible bloqueo de seguridad).")
+                    response_text = ""
+            except Exception as e:
+                print(f"⚠️ Error al extraer texto de Gemini: {e}")
+                response_text = ""
+                        
             
             # Extract token usage
             usage_metadata = response.usage_metadata

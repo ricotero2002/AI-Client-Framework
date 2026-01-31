@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any
 
-# Setup paths (Igual que antes)
+# Setup paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent.absolute()
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
@@ -43,7 +43,8 @@ class GraphRetriever:
 
     def _get_graph_schema(self) -> str:
         """
-        Obtiene Labels, Relaciones y, CRUCIALMENTE, las PROPIEDADES (Keys) de los nodos.
+        Obtiene Labels, Relaciones y un Muestreo Inteligente de 'Recetas'.
+        Busca nodos con propiedades nutritivas para entender la estructura de la Receta.
         """
         try:
             # 1. Labels
@@ -54,36 +55,36 @@ class GraphRetriever:
             rels = self.neo4j_manager.execute_query("CALL db.relationshipTypes()")
             rel_types = [r['relationshipType'] for r in rels] if rels else []
             
-            # 3. Propiedades de los Nodos (Para evitar el error .Name vs .name)
-            # Tomamos una muestra de un nodo 'Entity' y un nodo 'Chunk' (o genérico)
-            props_query = """
+            # 3. Muestreo Inteligente de RECETAS (Nodes with calories/protein)
+            # Esto es vital para que el LLM vea qué propiedades tiene una receta real
+            recipe_sample_query = """
             MATCH (n)
-            WITH labels(n) as lbl, keys(n) as k
-            RETURN distinct lbl, k
-            LIMIT 5
+            WHERE n.calories IS NOT NULL OR n.protein_g IS NOT NULL
+            RETURN labels(n) as labels, keys(n) as keys, n.name as name_example, n.calories as cal_example
+            LIMIT 3
             """
-            props = self.neo4j_manager.execute_query(props_query)
-            prop_context = [f"Label: {p['lbl']} -> Properties: {p['k']}" for p in props]
-
-            # 4. Muestreo de datos (Para idioma)
-            sample_query = """
-            MATCH (n) 
-            WHERE n.name IS NOT NULL 
-            RETURN n.name as name LIMIT 3
+            recipe_samples = self.neo4j_manager.execute_query(recipe_sample_query)
+            
+            # 4. Muestreo de INGREDIENTES (Nodes connected to recipes)
+            ingredient_sample_query = """
+            MATCH (r)-[:`Has ingredient`|`Contains ingredient`]->(i)
+            RETURN labels(i) as labels, i.name as name_example
+            LIMIT 3
             """
-            samples = self.neo4j_manager.execute_query(sample_query)
-            sample_data = [s['name'] for s in samples] if samples else []
+            ing_samples = self.neo4j_manager.execute_query(ingredient_sample_query)
 
             schema_desc = f"""
             --- DATABASE SCHEMA ---
             AVAILABLE NODE LABELS: {node_labels}
             AVAILABLE RELATIONSHIPS: {rel_types}
             
-            --- NODE PROPERTIES (STRICTLY FOLLOW THESE KEYS) ---
-            {prop_context}
+            --- RECIPE NODE STRUCTURE (Nodes that have calories/macros) ---
+            {json.dumps(recipe_samples[:2], default=str)}
             
-            --- DATA SAMPLES (Use for Language Detection) ---
-            {sample_data}
+            --- INGREDIENT NODE STRUCTURE ---
+            {json.dumps(ing_samples[:2], default=str)}
+            
+            NOTE: Use the keys found above (e.g. 'protein_g', 'calories') strictly.
             """
             return schema_desc
             
@@ -92,10 +93,9 @@ class GraphRetriever:
             return "Schema unavailable."
 
     def _route_query(self, query: str) -> str:
-        # (El router estaba bien, lo mantenemos igual o simplificado)
         prompt = f"""
         Router for Recipe RAG. Select strategy:
-        1. CYPHER: Specific filters (ingredients, calories, distinct counts).
+        1. CYPHER: Specific filters (ingredients, calories, distinct counts, names).
         2. VECTOR: Abstract themes (romantic dinner, comfort food).
         
         Query: "{query}"
@@ -106,7 +106,7 @@ class GraphRetriever:
 
     def _generate_cypher(self, query: str) -> str:
         """
-        Genera Cypher priorizando RELACIONES sobre LABELS de nodo para evitar fallos por esquemas sucios.
+        Genera Cypher forzando la estructura de grafo correcta.
         """
         
         prompt = f"""
@@ -115,27 +115,27 @@ class GraphRetriever:
         {self.schema_context}
 
         CRITICAL RULES:
-        1. **NODE LABELS (SAFETY FIRST)**: 
-           - **DO NOT** assume specific labels like `:Chunk`, `:Recipe` or `:Ingredient` unless you see them in the schema samples.
-           - **SAFER STRATEGY**: Use generic `(n)` or `(n:Entity)` and rely on the RELATIONSHIP to define the node.
-           - Example: Instead of `MATCH (r:Recipe)-[:Has]->(i:Ingredient)`, use `MATCH (r)-[:Has]->(i)`.
+        1. **IDENTIFYING RECIPES**: 
+           - To find a Recipe, DO NOT just use `MATCH (n:Entity)`. It's too broad.
+           - **BEST PRACTICE**: Use the pattern `MATCH (r)-[:`Has ingredient`]->()` to ensure 'r' is a recipe.
+           - Example for "Soup": 
+             `MATCH (r)-[:`Has ingredient`]->() WHERE toLower(r.name) CONTAINS 'soup' ...`
         
         2. **RELATIONSHIP SYNTAX**: 
            - Use backticks for spaces: [:`Has ingredient`]
            - Combine types with pipe: [:`Has ingredient`|`Contains ingredient`]
         
-        3. **MULTIPLE INGREDIENTS ("AND" LOGIC)**:
-           - Use multiple MATCH clauses.
-           - Example: 
-             MATCH (r)-[:`Has ingredient`]->(i1)
-             MATCH (r)-[:`Has ingredient`]->(i2)
-             WHERE toLower(i1.name) CONTAINS 'garbanzo' AND toLower(i2.name) CONTAINS 'berenjena'
+        3. **FILTERS & PROPERTIES**:
+           - Check 'RECIPE NODE STRUCTURE' above. Use exact keys (e.g. `protein_g`, `calories`).
+           - Ensure numerical comparisons use the correct type (usually numbers in DB).
         
-        4. **RICH RETURN**:
-           - Return `r.name`, `r.calories`, and `collect(distinct i.name)` (or similar properties found in schema).
-           - Do NOT filter strictly by `r.entity_type` unless you are sure.
+        4. **MULTIPLE INGREDIENTS**:
+           - Use multiple MATCH clauses for "AND".
+           - Ex: `MATCH (r)-[:`Has ingredient`]->(i1), (r)-[:`Has ingredient`]->(i2) WHERE ...`
         
-        5. **TRANSLATION**: Translate English/Spanish terms if needed.
+        5. **RICH RETURN**:
+           - Return `r.name`, `r.calories`, `r.protein_g` and `collect(distinct i.name)`.
+           - ALWAYS return the ingredients list so the user knows what's in it.
         
         User Query: "{query}"
         
@@ -158,14 +158,15 @@ class GraphRetriever:
                 results = self.neo4j_manager.execute_query(cypher_query)
                 if results:
                     contexts.extend([f"DB: {json.dumps(r, default=str)}" for r in results])
+                    print(f"✅ Cypher encontró {len(results)} registros.")
                 else:
-                    print("⚠️ Cypher ok, pero 0 resultados.")
+                    print("⚠️ Cypher ejecutó pero dio 0 resultados.")
             except Exception as e:
                 print(f"❌ Error Cypher: {e}")
 
         # Fallback Vectorial
         if not contexts:
-            print("🔍 Fallback Vectorial...")
+            print("🔍 Fallback Vectorial (Cypher vacío o fallido)...")
             nodes = self.vector_retriever.retrieve(query)
             contexts.extend([n.node.text for n in nodes])
             
@@ -176,10 +177,16 @@ class GraphRetriever:
         contexts = retrieval["contexts"]
         
         if not contexts:
-            return "No encontré recetas con esos ingredientes exactos en la base de datos."
+            return "No encontré recetas con esos criterios en la base de datos."
 
         prompt = f"""
-        Eres un Chef Asistente. Usa el contexto para responder.
+        Eres un Chef Asistente experto. Usa el contexto para responder.
+        
+        SI EL CONTEXTO ES DATA DE BASE DE DATOS (JSON):
+        - Describe la receta de forma apetitosa.
+        - Menciona sus calorías y proteínas si están disponibles.
+        - Lista los ingredientes clave.
+        
         Query: {query}
         Contexto: {json.dumps(contexts[:15], ensure_ascii=False)}
         Respuesta:

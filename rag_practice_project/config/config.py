@@ -31,8 +31,10 @@ DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash-lite")
 #DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gemini-2.0-flash-exp")
 
 # Configuración de modelo para evaluación
+# IMPORTANTE: DeepEval requiere modelos que generen JSON confiable
+# gemini-2.5-flash es más preciso que 2.0-flash para structured output
 EVALUATION_LLM_PROVIDER = os.getenv("EVALUATION_LLM_PROVIDER", "gemini")
-EVALUATION_MODEL = os.getenv("EVALUATION_MODEL", "gemini-2.0-flash")
+EVALUATION_MODEL = os.getenv("EVALUATION_MODEL", "gemini-2.5-pro")
 
 # Configuración de modelo para expansión de queries (Advanced RAG)
 EXPANSION_LLM_PROVIDER = os.getenv("EXPANSION_LLM_PROVIDER", "gemini")

@@ -17,18 +17,59 @@ from rag_practice_project.config.config import RESULTS_DIR, PROCESSED_DATA_DIR
 
 # Consultas de prueba
 
+# ============================================================================
+# IMPORTANTE: Formato para DeepEval (ACTUALIZADO)
+# ============================================================================
+# TEST_QUERIES ahora requiere el formato:
+# [
+#     {"query": "Pregunta del usuario", "expected_output": "Respuesta esperada"},
+#     {"query": "Otra pregunta", "expected_output": "Otra respuesta esperada"}
+# ]
+#
+# El "expected_output" (Ground Truth) es necesario para que DeepEval evalúe:
+# - Contextual Recall: ¿El contexto tiene la info necesaria?
+# - Faithfulness: ¿La respuesta alucina información?
+# - Answer Relevancy: ¿La respuesta es relevante a la query?
+#
+# Si NO tienes Ground Truth, puedes usar un placeholder:
+# {"query": "...", "expected_output": "Respuesta detallada sobre la consulta."}
+#
+# Ver: src/evaluation/test_queries_example.py para ejemplos completos
+# Ver: src/evaluation/DEEPEVAL_GUIDE.md para documentación completa
+# ============================================================================
+
+# TODO: Actualizar a nuevo formato con expected_output para cada query
 # Lista de consultas de prueba para estresar el sistema RAG
+# ============================================================================
+# DATASET DE PRUEBA (Ground Truth)
+# Basado en análisis de 'vegan_recipes_processed.csv'
+# ============================================================================
+
 TEST_QUERIES = [
-    #"¿Cómo preparar un brownie de chocolate vegano y sin gluten?",
-    #"¿Cuál es el procedimiento para hacer leche de soja casera?",
-    "Menciona exactamente 3 recetas que contengan garbanzos.",
-    "¿Qué recetas tienen más de 15g de proteína por porción?",
-    "Dame solo una receta de sopa que tenga menos de 200 calorías.",
-    #"Dame una receta rápida para un desayuno con avena.",
-    "Necesito recetas con quinoa que tengan al menos 12g de proteína.",
-    #"¿Cómo preparar tacos de carne de res con crema?",
-    "Tengo berenjena y garbanzos, ¿qué receta puedo hacer?",
-    "Dame dos opciones de platos que sean picantes."
+    {
+        "query": "Menciona exactamente 3 recetas que contengan garbanzos.",
+        "expected_output": "Aquí tienes 3 recetas con garbanzos disponibles en la base de datos: 1) Chickpea & Potato Curry, 2) Roasted Curried Chickpeas and Cauliflower, 3) Lemony Chickpeas (o Mediterranean Chickpeas)."
+    },
+    {
+        "query": "Dame solo una receta de sopa que tenga menos de 200 calorías.",
+        "expected_output": "Puedes preparar la 'Creamy Cauliflower Pakora Soup', que tiene solo 135 calorías por porción."
+    },
+    {
+        "query": "Necesito recetas con quinoa que tengan al menos 12g de proteína.",
+        "expected_output": "Tengo estas opciones con quinoa y buena proteína: 'Garden Quinoa Salad' que cuenta con 16g de proteína y 'Black Bean & Corn Quinoa' que cuenta con 13g de proteína."
+    },
+    {
+        "query": "¿Cómo preparar tacos de carne de res con crema?",
+        "expected_output": "Soy vegano, por lo que no conozco recetas con carne de res. Como alternativa de estilo mexicano sin carne, te sugiero probar las 'No-Fry Black Bean Chimichangas' o el 'Black Bean-Tomato Chili'."
+    },
+    {
+        "query": "Tengo berenjena y garbanzos, ¿qué receta puedo hacer?",
+        "expected_output": "No tengo ninguna receta que combine específicamente berenjena y garbanzos. Sin embargo, tengo varias recetas excelentes solo con garbanzos, como el 'Chickpea & Potato Curry' o los 'Garbanzo-Stuffed Mini Peppers'."
+    },
+    {
+        "query": "Dame dos opciones de platos que sean picantes.",
+        "expected_output": "Dos opciones con perfil de sabor picante o especiado son: 1) 'Chickpea & Potato Curry' y 2) 'Tropical Fusion Salad with Spicy Tortilla Ribbons' (o el 'Black Bean-Tomato Chili')."
+    }
 ]
 
 def main():
@@ -95,12 +136,12 @@ def main():
     
     strategies = [
         #NoRAGStrategy(),
-        #NaiveRAGStrategy(top_k=3),
-        #AdvancedRAGStrategy(top_k=20),
-        #AgenticRAGStrategy(max_iterations=15),
+        NaiveRAGStrategy(top_k=3),
+        AdvancedRAGStrategy(top_k=20),
+        AgenticRAGStrategy(max_iterations=15),
     ]
     
-    # Add Graph RAG if loaded
+    # Add Graph RAG if loaded``
     if use_graph_rag and graph_retriever is not None:
         strategies.append(GraphRAGStrategy(
             top_k=10, 
