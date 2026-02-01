@@ -103,8 +103,11 @@ class Prompt:
         self._conversation_id: Optional[int] = None
         
         # Conversation context (separate from few-shots)
-        self._conversation_context: List[Dict[str, str]] = []
-        self._max_context_messages: int = 10
+        self._conversation_context: List[Dict[str, Any]] = []
+        self._max_context_messages: int = 20
+        
+        # Tools
+        self._tools: List[Any] = []
         
         # Set default delimiters if enabled
         if use_delimiters:
@@ -158,6 +161,81 @@ class Prompt:
         """
         self._user_input = message
         return self
+    
+    def add_user_message(self, message: str) -> 'Prompt':
+        """
+        Add a user message to the conversation history
+        
+        Args:
+            message: User message content
+            
+        Returns:
+            Self for method chaining
+        """
+        self._conversation_context.append({'role': 'user', 'content': message})
+        return self
+
+    def add_assistant_message(self, message: str) -> 'Prompt':
+        """
+        Add an assistant message to the conversation history
+        
+        Args:
+            message: Assistant message content
+            
+        Returns:
+            Self for method chaining
+        """
+        self._conversation_context.append({'role': 'assistant', 'content': message})
+        return self
+        
+    def set_history(self, messages: List[Dict[str, Any]]) -> 'Prompt':
+        """
+        Set the entire conversation history
+        
+        Args:
+            messages: List of message dicts ({'role': ..., 'content': ...})
+        
+        Returns:
+            Self for method chaining
+        """
+        self._conversation_context = messages
+        return self
+
+    # ==================== Tool Methods ====================
+
+    def add_tool(self, tool: Any) -> 'Prompt':
+        """
+        Add a tool to the prompt
+        
+        Args:
+            tool: The tool object/function to add
+            
+        Returns:
+            Self for method chaining
+        """
+        self._tools.append(tool)
+        return self
+    
+    def set_tools(self, tools: List[Any]) -> 'Prompt':
+        """
+        Set multiple tools at once
+        
+        Args:
+            tools: List of tool objects
+            
+        Returns:
+            Self for method chaining
+        """
+        self._tools = tools
+        return self
+    
+    def get_tools(self) -> List[Any]:
+        """Get the list of tools"""
+        return self._tools
+    
+    def has_tools(self) -> bool:
+        """Check if prompt has tools"""
+        return len(self._tools) > 0
     
     def set_metadata(self, key: str, value: any) -> 'Prompt':
         """
@@ -630,7 +708,9 @@ class Prompt:
             for msg in context_to_use:
                 # Skip system messages from context (we already have one)
                 if msg['role'] != 'system':
-                    messages.append({'role': msg['role'], 'content': msg['content']})
+                    # Only include supported roles for history
+                    if msg['role'] in ['user', 'assistant', 'function', 'tool']:
+                        messages.append(msg)
         
         # Add user input
         if self._user_input:
@@ -678,7 +758,7 @@ class Prompt:
             Tuple of (is_valid, error_message)
         """
         # Must have at least user input
-        if not self._user_input:
+        if not self._user_input and len(self._conversation_context) == 0:
             return False, "Prompt must have user input"
         
         # Check for undefined variables
@@ -694,6 +774,30 @@ class Prompt:
         
         return True, None
     
+    def add_tool_message(self, tool_name: str, output: str, tool_call_id: Optional[str] = None) -> 'Prompt':
+        """
+        Add a tool output message to the conversation history.
+        
+        Args:
+            tool_name: Name of the tool that generated the output
+            output: The output content from the tool
+            tool_call_id: Optional unique ID for the tool call (required by some APIs like OpenAI/Gemini)
+            
+        Returns:
+            Self for method chaining
+        """
+        message = {
+            'role': 'tool', 
+            'content': output,
+            'name': tool_name
+        }
+        
+        if tool_call_id:
+            message['tool_call_id'] = tool_call_id
+            
+        self._conversation_context.append(message)
+        return self
+
     def is_empty(self) -> bool:
         """Check if prompt is empty"""
         return not (self._system_message or self._few_shot_examples or self._user_input)
@@ -1164,6 +1268,24 @@ class Prompt:
 
 
 # ==================== Helper Functions ====================
+def convert_langchain_tool_to_gemini(tool):
+    """Convierte una herramienta de LangChain a una declaración de función de Gemini"""
+    # Get parameters schema handling both Pydantic models and dicts
+    parameters = {"type": "object", "properties": {}}
+    
+    if tool.args_schema:
+        if hasattr(tool.args_schema, 'model_json_schema'):
+            parameters = tool.args_schema.model_json_schema()
+        elif isinstance(tool.args_schema, dict):
+            parameters = tool.args_schema
+            
+    function_decl = {
+        "name": tool.name,
+        "description": tool.description,
+        "parameters": parameters
+    }
+    return function_decl
+
 
 def create_simple_prompt(text: str) -> Prompt:
     """
