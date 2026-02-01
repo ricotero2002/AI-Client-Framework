@@ -157,10 +157,18 @@ class GeminiClient(BaseAIClient):
             config_params.update(gemini_gen_config)
             
             # Check for structured output only if original_prompt is a Prompt object
-            if isinstance(original_prompt, Prompt) and original_prompt.has_structured_output():
-                config_params['response_mime_type'] = "application/json"
-                config_params['response_json_schema'] = original_prompt.get_pydantic_model().model_json_schema()
-            
+            if isinstance(original_prompt, Prompt):
+                if original_prompt.has_structured_output():
+                    config_params['response_mime_type'] = "application/json"
+                    config_params['response_json_schema'] = original_prompt.get_pydantic_model().model_json_schema()
+                
+                # Add tools if present
+                if original_prompt.has_tools():
+                    # Format tools for Google GenAI SDK
+                    # SDK expects tools=[Tool(function_declarations=[...])]
+                    # original_prompt.get_tools() returns a list of function declaration dicts
+                    config_params['tools'] = [{'function_declarations': original_prompt.get_tools()}]
+
             # Create config object if we have parameters
             config = types.GenerateContentConfig(**config_params) if config_params else None
             
@@ -176,12 +184,29 @@ class GeminiClient(BaseAIClient):
             try:
                 # El modelo Pro puede devolver múltiples 'candidates' o ninguno si hay bloqueo
                 if response.candidates and response.candidates[0].content.parts:
-                    response_text = response.text
+                    for part in response.candidates[0].content.parts:
+                        if part.function_call:
+                            # Serialize function call to JSON
+                            import json
+                            # Convert Map to dict safely
+                            args = dict(part.function_call.args) if part.function_call.args else {}
+                            fc_data = {
+                                "function_call": {
+                                    "name": part.function_call.name,
+                                    "args": args
+                                }
+                            }
+                            response_text = json.dumps(fc_data)
+                            break # Priority to function call
+                        else:
+                            response_text += part.text or ""
                 else:
                     print(f"⚠️ El modelo {self.current_model} no generó contenido (posible bloqueo de seguridad).")
                     response_text = ""
             except Exception as e:
                 print(f"⚠️ Error al extraer texto de Gemini: {e}")
+                import traceback
+                traceback.print_exc()
                 response_text = ""
                         
             
