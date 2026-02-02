@@ -464,9 +464,11 @@ CRITICAL RULES:
                                     if 'final_summary' in e:
                                         print(f"\n{e['final_summary']['messages'][-1].content}\n")
                             else:
+                                current_plan = snapshot.values.get('current_plan')
                                 reason = input("Razón del rechazo: ")
                                 AuditLogger.log("VERIFICATION", f"User REJECTED changes. Reason: {reason}")
                                 # FIX: Removed await from update_state
+                                feedback_manager.save_feedback(user_input, current_plan, reason)
                                 app.update_state(config, {"verification_status": "rejected", "user_feedback": reason})
                                 print("🔄 Iniciando restauración y re-planificación...")
                                 async for e in app.astream(None, config=config): pass
