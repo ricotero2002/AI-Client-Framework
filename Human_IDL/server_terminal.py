@@ -1,38 +1,50 @@
+# server_terminal.py
 import os
 import subprocess
+import sys
 from mcp.server.fastmcp import FastMCP
 
+# Inicializamos el servidor
 mcp = FastMCP("terminal")
 
+
 @mcp.tool()
-async def run_server_command(command: str, path: str = ".") -> str:
+async def run_server_command(command: str, path: str) -> str:
     """
-    Executes a shell command in the specified directory (Windows/PowerShell).
+    Executes a PowerShell command in the current directory.
+    
     Args:
-        command: The command to execute (e.g., 'dir', 'Get-ChildItem').
-        path: The target directory path.
+        command: The PowerShell command to execute. 
+                 Example: 'Get-ChildItem', 'Remove-Item -Path ./imagen.png'
+        path: The directory where the command will be executed.
     """
-    if not os.path.exists(path):
-        return f"Error: The path '{path}' does not exist."
+    print(f"DEBUG: Executing: {command[:50]}...", file=sys.stderr)
 
     try:
-        # Forzamos shell=True y powershell para consistencia en Windows
-        # Usamos 'chcp 65001' para asegurar UTF-8 si es necesario, o decodificamos con cuidado
+        # Usamos powershell explícitamente para evitar problemas de cmd.exe
+        # encoding='cp850' o 'utf-8' suele ser necesario en Windows
         result = subprocess.run(
-            f"powershell -Command \"{command}\"", 
-            cwd=path, 
-            shell=True, 
-            capture_output=True, 
+            ["powershell", "-Command", command],
+            cwd=path,
+            capture_output=True,
             text=True,
-            encoding='utf-8', # Importante para caracteres latinos
-            errors='replace'
+            encoding='utf-8', 
+            errors='replace' # Evita crash por caracteres raros
         )
-        output = result.stdout.strip() or result.stderr.strip()
-        if not output:
-            return "Command executed successfully with no output."
-        return output
+        
+        # Combinamos stdout y stderr para que el modelo vea todo
+        output = result.stdout.strip()
+        error = result.stderr.strip()
+        
+        if output:
+            return f"OUTPUT:\n{output}"
+        if error:
+            return f"ERROR:\n{error}"
+        
+        return "Command executed successfully (No output returned)."
+
     except Exception as e:
-        return f"System Error executing command: {str(e)}"
+        return f"SYSTEM ERROR: {str(e)}"
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
