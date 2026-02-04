@@ -1,71 +1,386 @@
-# AI Client Framework
+# AI Client Framework & Agentic Systems
 
-Un framework completo y extensible para orquestar múltiples LLMs (OpenAI, Gemini, Anthropic) con soporte nativo para **Prompt Engineering Estructurado**, **Chat con Persistencia**, **Sistema de Evaluación de Prompts**, **Tracing Avanzado** y **Workflows Agenciales**.
+**Framework completo y extensible para orquestar LLMs, construir agentes autónomos, y desarrollar sistemas de IA de producción**
 
----
-
-## 🎯 Core Features
-
-### 1. **Multi-Provider Unified API**
-Interfaz polimórfica para OpenAI (Responses API), Google Gemini (SDK 2.0) y Anthropic Claude.
-
-### 2. **Structured Prompt Engine**
-Clase `Prompt` robusta con:
-- System instructions
-- Few-shot examples
-- Templates con `[[variables]]`
-- Esquemas de salida estructurados (Pydantic)
-- Tracking de uso y costos
-- Versionado y mejora automática
-
-### 3. **Chat System con Persistencia**
-Sistema completo de chat con:
-- Persistencia en SQLite
-- Compresión automática de contexto
-- Tracking de modelo y prompt por mensaje
-- Historial completo de conversaciones
-
-### 4. **Prompt Evaluation System (Evals)**
-Sistema de evaluación de prompts con:
-- Golden examples (test cases)
-- Evaluación automática con LLM
-- Feedback humano
-- Mejora automática de prompts
-- Versionado de prompts
-
-### 5. **Observability (LangSmith)**
-Integración nativa con LangSmith para tracing detallado de tokens, modelos y proveedores.
-
-### 6. **Advanced Pricing & Counting**
-Gestión centralizada de más de 60 modelos con pricing detallado (input, output, cached).
+Un ecosistema integrado que incluye: wrapper unificado multi-provider, sistema de prompts estructurados, agentes con supervisión humana, pipelines de generación de contenido, servidores MCP, sistemas RAG avanzados, y herramientas de evaluación.
 
 ---
 
-## 📁 Estructura del Proyecto
+## 🎯 Proyectos Principales
+
+### 1. **🤖 Human-in-the-Loop IDL Agent** ⭐⭐⭐
+**Agente Autónomo con Supervisión Humana y Sistema de Rollback**
+
+Agente inteligente basado en LangGraph y MCP que ejecuta comandos de terminal de forma autónoma, con aprobación humana para operaciones peligrosas, sistema de backup/restore automático, y capacidad de aprendizaje de errores pasados.
+
+**Características:**
+- ✅ Arquitectura de doble agente (Planner + Executor)
+- ✅ Supervisión humana selectiva (solo para operaciones unsafe)
+- ✅ Backup automático antes de cambios destructivos
+- ✅ Rollback inteligente si el usuario rechaza cambios
+- ✅ Aprendizaje de errores (Golden Dataset)
+- ✅ Protección contra alucinaciones de paths
+- ✅ Auditoría completa en `execution_audit.log`
+
+**Tecnologías:** LangGraph, MCP, Gemini 2.5, Pydantic
+
+📂 **Directorio:** `Human_IDL/`  
+📖 **README:** [Human_IDL/README.md](Human_IDL/README.md)
+
+**Ejemplo de Uso:**
+```bash
+python client.py server_terminal.py
+```
+
+---
+
+### 2. **🔧 AI Client Framework (Core)** ⭐⭐⭐
+**Wrapper Unificado Multi-Provider con Prompt Engineering Avanzado**
+
+Framework robusto para orquestar múltiples LLMs (OpenAI, Gemini, Anthropic) con soporte nativo para prompts estructurados, chat persistente, evaluación de prompts, y tracing avanzado.
+
+#### **Nuevas Funcionalidades del Wrapper**
+
+##### **Prompt Class - Soporte para Chats**
+```python
+from prompt import Prompt
+
+# Crear prompt con historial de conversación
+prompt = Prompt()
+prompt.set_system("Eres un asistente experto en Python")
+
+# Agregar mensajes al historial
+prompt.add_user_message("¿Qué es una lista?")
+prompt.add_assistant_message("Una lista es una estructura de datos...")
+prompt.add_user_message("Dame un ejemplo")
+
+# Obtener respuesta (mantiene contexto)
+response, _ = client.get_response(prompt)
+```
+
+**Características del Chat:**
+- ✅ Historial de conversación completo
+- ✅ Soporte para mensajes de herramientas (tool messages)
+- ✅ Límite configurable de mensajes en contexto
+- ✅ Compatible con todos los providers
+
+##### **Gemini Client - Cambio Automático de Modelo**
+```python
+from gemini_client import GeminiClient
+
+client = GeminiClient()
+client.select_model('gemini-2.5-flash')
+
+# Si el modelo alcanza rate limit o está sobrecargado,
+# automáticamente cambia a un modelo alternativo similar
+response, _ = client.get_response(prompt)
+# ⚠️  Rate limit hit for gemini-2.5-flash. Trying fallback models...
+# 🔄 Attempting with gemini-2.0-flash-exp...
+# ✅ Success with gemini-2.0-flash-exp!
+```
+
+**Sistema de Fallbacks:**
+- 🔄 Fallbacks inteligentes basados en pricing similar
+- 🔄 Detección automática de rate limits (429) y sobrecarga (503)
+- 🔄 Cambio permanente al modelo alternativo si funciona
+- 🔄 Top 5 alternativas ordenadas por cercanía de precio
+
+##### **Otras Mejoras del Wrapper**
+
+**Structured Output con Pydantic:**
+```python
+from pydantic import BaseModel
+
+class BookInfo(BaseModel):
+    title: str
+    author: str
+    summary: str
+
+prompt = Prompt()
+prompt.set_output_schema(BookInfo)
+response, _ = client.get_response(prompt)
+
+# Validación automática
+is_valid, data, error = prompt.validate_response(response)
+```
+
+**Tool Support:**
+```python
+# Agregar herramientas al prompt
+prompt.set_tools(gemini_tools)
+
+# Convertir herramientas LangChain a formato Gemini
+from prompt import convert_langchain_tool_to_gemini
+gemini_tools = [convert_langchain_tool_to_gemini(t) for t in lc_tools]
+```
+
+**Template Variables:**
+```python
+prompt.set_user_input("Analiza este texto: [[text]]")
+prompt.set_variable("text", "Hello world")
+```
+
+**File Attachments:**
+```python
+prompt.attach_image("screenshot.png", description="Error screenshot")
+prompt.attach_pdf("document.pdf")
+```
+
+#### **Core Features**
+
+1. **Multi-Provider Unified API**
+   - OpenAI (Responses API)
+   - Google Gemini (SDK 2.0)
+   - Anthropic Claude
+
+2. **Structured Prompt Engine**
+   - System instructions
+   - Few-shot examples
+   - Templates con `[[variables]]`
+   - Esquemas de salida estructurados (Pydantic)
+   - Tracking de uso y costos
+   - Versionado y mejora automática
+
+3. **Chat System con Persistencia**
+   - Persistencia en SQLite
+   - Compresión automática de contexto
+   - Tracking de modelo y prompt por mensaje
+   - Historial completo de conversaciones
+
+4. **Prompt Evaluation System (Evals)**
+   - Golden examples (test cases)
+   - Evaluación automática con LLM
+   - Feedback humano
+   - Mejora automática de prompts
+   - Versionado de prompts
+
+5. **Observability (LangSmith)**
+   - Integración nativa con LangSmith
+   - Tracing detallado de tokens, modelos y proveedores
+
+6. **Advanced Pricing & Counting**
+   - Gestión centralizada de más de 60 modelos
+   - Pricing detallado (input, output, cached)
+
+**Archivos Core:**
+- `base_client.py` - Abstract Base Class
+- `client_factory.py` - Factory para instanciación dinámica
+- `openai_client.py` - Cliente OpenAI
+- `gemini_client.py` - Cliente Gemini con fallbacks
+- `prompt.py` - Motor de prompts estructurados (47KB, 1331 líneas)
+- `chat.py` - Sistema de chat con persistencia
+- `database.py` - ORM y gestión de base de datos
+- `prompt_evaluator.py` - Motor de evaluación
+- `config.py` - Configuración de modelos y pricing
+
+**Ejemplos:**
+- `examples/chat_example.py` - Chat básico
+- `examples/prompt_tracking_example.py` - Tracking de uso
+- `examples/comedian_eval_example.py` - Evaluación completa
+- `interactive_chat_test.py` - Chat interactivo
+
+---
+
+### 3. **📊 LangGraph Content Generation Pipeline** ⭐⭐
+**Sistema de Generación de Contenido con Paralelización y Feedback Loops**
+
+Workflow avanzado de generación de contenido que demuestra patrones de orquestación complejos: Map-Reduce, Conditional Routing, Feedback Loops y Structured Output.
+
+**Características:**
+- ✅ **Map-Reduce Pattern**: Genera múltiples secciones en paralelo (~60% más rápido)
+- ✅ **Feedback Loop**: Editor revisa y reescribe automáticamente
+- ✅ **Structured Output**: Validación con Pydantic
+- ✅ **LangSmith Tracing**: Observabilidad completa
+
+**Pipeline:**
+1. **Ideation**: Genera ángulo único para el tema
+2. **Outline**: Estructura con 3-5 secciones (structured output)
+3. **Writing**: Genera secciones en paralelo (Map)
+4. **Assembler**: Une las piezas (Reduce)
+5. **Editor**: Revisa y mejora (Feedback Loop)
+
+📂 **Directorio:** `langGraph/`  
+📖 **README:** [langGraph/README.md](langGraph/README.md)
+
+**Ejemplo de Uso:**
+```bash
+python langgraph_chaining.py
+```
+
+---
+
+### 4. **🔐 NeMo Defense Bot** ⭐⭐
+**Sistema de Defensa para LLMs con Guardrails Multicapa**
+
+Sistema de guardrails implementado con NVIDIA NeMo Guardrails para proteger modelos de lenguaje contra ataques adversariales, jailbreaks, inyecciones y exposición de PII.
+
+**Características:**
+- ✅ **Detección de Jailbreaks**: NVIDIA NeMo Guard API
+- ✅ **Moderación de Contenido**: Nemotron Safety Guard 8B
+- ✅ **Control de Tópicos**: Restricción de dominios
+- ✅ **Protección de PII**: GLiNER para enmascaramiento automático
+- ✅ **Detección de Inyecciones**: SQL, XSS, Template, Code
+- ✅ **Guardrails Personalizados**: Regex patterns, topic blockers
+
+**Resultados de Evaluación:**
+- **Garak (PromptInject)**: 100% de bloqueo (DEFCON 5)
+- **Moderation Eval**: 6/6 casos bloqueados correctamente
+
+📂 **Directorio:** `nemo_defense_bot/`  
+📖 **README:** [nemo_defense_bot/README.md](nemo_defense_bot/README.md)
+
+**Ejemplo de Uso:**
+```bash
+.\start_nemo_server.ps1
+```
+
+---
+
+### 5. **🌐 MCP Servers Suite** ⭐⭐
+
+#### **5.1 GitHub PR Review + Notion**
+Servidor MCP para análisis automático de Pull Requests con integración a Notion.
+
+**Características:**
+- ✅ Fetch automático de PRs de GitHub
+- ✅ Análisis de diffs línea por línea
+- ✅ Creación de documentación en Notion
+- ✅ Compatible con Claude Desktop
+
+📂 **Directorio:** `MCP/PR_Review/`  
+📖 **README:** [MCP/PR_Review/README.md](MCP/PR_Review/README.md)
+
+**Herramientas MCP:**
+- `fetch_pr(repo_owner, repo_name, pr_number)`: Obtiene cambios del PR
+- `create_notion_page(title, content)`: Crea página en Notion
+
+#### **5.2 Multi-MCP Server con FastAPI**
+Servidor FastAPI que expone múltiples servidores MCP vía HTTP.
+
+**Características:**
+- ✅ Múltiples servidores MCP en una app
+- ✅ Endpoints HTTP independientes
+- ✅ Gestión unificada de lifecycle
+- ✅ Fácil extensión con nuevos servidores
+
+📂 **Directorio:** `MCP/Multi_mcp/`  
+📖 **README:** [MCP/Multi_mcp/README.md](MCP/Multi_mcp/README.md)
+
+**Servidores Incluidos:**
+- `/echo/mcp`: Herramientas de ejemplo (echo, reverse)
+- `/math/mcp`: Operaciones matemáticas (add, multiply)
+
+**Ejemplo de Uso:**
+```bash
+python main.py
+curl -X POST http://localhost:8000/math/mcp/call \
+  -d '{"tool": "add_tool", "arguments": {"a": 10, "b": 32}}'
+```
+
+---
+
+### 6. **📚 RAG Practice Project** ⭐⭐
+**Sistema RAG Multi-Estrategia con Evaluación Comparativa**
+
+Implementación completa de múltiples estrategias RAG (Naive, Advanced, Agentic, Graph) con sistema de evaluación y comparación de performance.
+
+**Estrategias Implementadas:**
+- **Naive RAG**: Retrieval básico + generación
+- **Advanced RAG**: Query expansion + re-ranking + prompt engineering
+- **Agentic RAG**: Agente con herramientas (retrieve, search, calculate)
+- **Graph RAG**: Knowledge Graph con Neo4j
+
+**Características:**
+- ✅ Evaluación automática con métricas (Faithfulness, Relevancy, etc.)
+- ✅ Comparación de estrategias
+- ✅ Análisis de trade-offs (calidad vs velocidad)
+- ✅ Visualización de resultados
+
+📂 **Directorio:** `rag_practice_project/`  
+📖 **README:** [rag_practice_project/README.md](rag_practice_project/README.md)
+
+**Ejemplo de Uso:**
+```bash
+python run_all_experiments.py
+python compare_systems.py
+```
+
+---
+
+### 7. **🎯 Gbeder System** ⭐
+**Sistema de Benchmarking de Agentes con MCP**
+
+Sistema completo para evaluar agentes de IA usando el benchmark GAIA, con integración de herramientas MCP (Tavily search, calculadora, etc.).
+
+**Características:**
+- ✅ Benchmark GAIA (General AI Assistants)
+- ✅ Integración con Tavily para búsqueda web
+- ✅ Herramientas MCP personalizadas
+- ✅ Análisis de resultados y métricas
+
+📂 **Directorio:** `gbeder_system/`  
+📖 **README:** [gbeder_system/README.md](gbeder_system/README.md)
+
+---
+
+## 📁 Estructura del Repositorio
 
 ```
 IA/
-├── base_client.py              # Abstract Base Class para clientes
-├── client_factory.py           # Factory para instanciación dinámica
-├── openai_client.py            # Cliente OpenAI (Responses API)
-├── gemini_client.py            # Cliente Google Gemini (SDK 2.0)
-├── anthropic_client.py         # Cliente Anthropic Claude
-├── openai_client_smith.py      # OpenAI con LangSmith tracing
-├── gemini_client_smith.py      # Gemini con LangSmith tracing
-├── prompt.py                   # Motor de prompts estructurados
-├── chat.py                     # Sistema de chat con persistencia
-├── database.py                 # ORM y gestión de base de datos
-├── eval_database.py            # Extensiones para sistema de evaluación
-├── prompt_evaluator.py         # Motor de evaluación de prompts
-├── config.py                   # Configuración de modelos y pricing
-├── compare_prompts.py          # Herramienta de comparación de prompts
-├── interactive_chat_test.py    # Chat interactivo para testing
-├── examples/
-│   ├── chat_example.py         # Ejemplo de chat básico
-│   ├── prompt_tracking_example.py  # Ejemplo de tracking de uso
-│   ├── comedian_eval_example.py    # Ejemplo completo de evaluación
-│   └── test_improvement.py     # Mejora de prompts con feedback
-└── data/                       # Base de datos SQLite (auto-generada)
+├── 🤖 Human_IDL/                    # Agente autónomo con supervisión humana
+│   ├── client.py                    # Agente principal (LangGraph)
+│   ├── server_terminal.py           # Servidor MCP
+│   └── README.md
+│
+├── 📊 langGraph/                    # Pipelines de generación de contenido
+│   ├── langgraph_chaining.py        # Pipeline con Map-Reduce
+│   └── README.md
+│
+├── 🔐 nemo_defense_bot/             # Sistema de guardrails para LLMs
+│   ├── config/                      # Configuración de guardrails
+│   ├── eval_outputs/                # Resultados de evaluaciones
+│   └── README.md
+│
+├── 🌐 MCP/                          # Servidores MCP
+│   ├── PR_Review/                   # GitHub PR + Notion
+│   ├── Multi_mcp/                   # Multi-server FastAPI
+│   └── Custom_Client/               # Cliente MCP personalizado
+│
+├── 📚 rag_practice_project/         # Sistema RAG multi-estrategia
+│   ├── src/rag_strategies/          # Implementaciones de RAG
+│   ├── results/                     # Resultados de experimentos
+│   └── README.md
+│
+├── 🎯 gbeder_system/                # Benchmarking de agentes
+│   ├── agents.py                    # Agentes con MCP
+│   ├── eval.py                      # Sistema de evaluación
+│   └── README.md
+│
+├── 🔧 Core Framework/               # Wrapper de LLMs
+│   ├── base_client.py               # Abstract base class
+│   ├── client_factory.py            # Factory pattern
+│   ├── openai_client.py             # Cliente OpenAI
+│   ├── gemini_client.py             # Cliente Gemini (con fallbacks)
+│   ├── prompt.py                    # Motor de prompts (47KB)
+│   ├── chat.py                      # Sistema de chat
+│   ├── database.py                  # Persistencia SQLite
+│   ├── prompt_evaluator.py          # Evaluación de prompts
+│   └── config.py                    # Configuración y pricing
+│
+├── 📝 examples/                     # Ejemplos de uso
+│   ├── chat_example.py
+│   ├── prompt_tracking_example.py
+│   ├── comedian_eval_example.py
+│   └── test_improvement.py
+│
+├── 🛠️ Herramientas/
+│   ├── compare_prompts.py           # Comparación de prompts
+│   ├── interactive_chat_test.py     # Chat interactivo
+│   └── prueba_modelos.py            # Testing de modelos
+│
+├── .env                             # Variables de entorno
+├── requirements.txt                 # Dependencias
+└── README.md                        # Este archivo
 ```
 
 ---
@@ -75,23 +390,43 @@ IA/
 ### 1. Instalación
 
 ```bash
+# Clonar repositorio
+git clone <repository-url>
+cd IA
+
+# Crear entorno virtual
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # Linux/Mac
+
+# Instalar dependencias
 pip install -r requirements.txt
 ```
 
-### 2. Configuración (.env)
+### 2. Configuración
 
+Crear archivo `.env` en la raíz:
 ```env
+# LLM APIs
 OPENAI_API_KEY=sk-...
 GEMINI_API_KEY=...
 ANTHROPIC_API_KEY=...
 
-# Opcional para Tracing
+# Opcional: LangSmith Tracing
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=ls__...
-LANGCHAIN_PROJECT="my-project"
+LANGCHAIN_PROJECT=my-project
+
+# Opcional: MCP Servers
+GITHUB_TOKEN=ghp_...
+NOTION_API_KEY=secret_...
+NOTION_PAGE_ID=...
+
+# Opcional: NeMo Guardrails
+NVIDIA_API_KEY=nvapi-...
 ```
 
-### 3. Uso Básico
+### 3. Uso Básico del Framework
 
 ```python
 from client_factory import create_client
@@ -99,7 +434,7 @@ from prompt import Prompt
 
 # Crear cliente
 client = create_client('gemini')
-client.select_model('gemini-2.0-flash-exp')
+client.select_model('gemini-2.5-flash')
 
 # Crear prompt
 prompt = Prompt()
@@ -109,6 +444,10 @@ prompt.set_user_input("¿Qué es Python?")
 # Obtener respuesta
 response, usage = client.get_response(prompt)
 print(response)
+
+# Ver costos
+cost = client.estimate_cost(usage.prompt_tokens, usage.completion_tokens)
+print(f"Costo: ${cost.total_cost:.6f}")
 ```
 
 ---
@@ -116,8 +455,6 @@ print(response)
 ## 📚 Guías de Uso Detalladas
 
 ### 🔹 Structured Outputs con Pydantic
-
-Valida automáticamente respuestas JSON usando modelos Pydantic:
 
 ```python
 from pydantic import BaseModel, Field
@@ -139,18 +476,10 @@ book = BookInfo.model_validate_json(response_json)
 print(book.title, book.author)
 ```
 
-**Ejemplo completo:** `examples/prompt_tracking_example.py`
-
----
-
 ### 🔹 Chat con Persistencia
-
-Sistema completo de chat con historial persistente y compresión automática:
 
 ```python
 from chat import ChatSession
-from client_factory import create_client
-from prompt import Prompt
 
 # Crear nueva conversación
 chat = ChatSession(title="Mi Chat", max_messages=10)
@@ -159,9 +488,6 @@ chat = ChatSession(title="Mi Chat", max_messages=10)
 prompt = Prompt()
 prompt.set_system("Eres un asistente experto en Python.")
 prompt.save()
-
-# Crear cliente
-client = create_client('gemini')
 
 # Conversación
 chat.add_message('user', '¿Qué es una lista?')
@@ -172,25 +498,9 @@ print(response)
 chat2 = ChatSession.load(chat.conversation_id)
 ```
 
-**Características:**
-- ✅ Persistencia automática en SQLite
-- ✅ Compresión de contexto cuando excede `max_messages`
-- ✅ Tracking de modelo y prompt por mensaje
-- ✅ Estadísticas de uso y costos
-
-**Ejemplo completo:** `examples/chat_example.py`
-
-**Herramienta interactiva:** `interactive_chat_test.py`
-
----
-
 ### 🔹 Prompt Tracking y Estadísticas
 
-Trackea el uso de tus prompts y analiza costos:
-
 ```python
-from prompt import Prompt
-
 # Crear y guardar prompt
 prompt = Prompt()
 prompt.set_system("Eres un revisor de código.")
@@ -213,191 +523,40 @@ prompt.save_usage(
 stats = prompt.get_usage_stats()
 print(f"Total llamadas: {stats['total_calls']}")
 print(f"Costo total: ${stats['total_cost']:.6f}")
-print(f"Promedio por llamada: ${stats['total_cost']/stats['total_calls']:.6f}")
-
-# Estadísticas por modelo
-model_stats = prompt.get_usage_by_model()
-for model, data in model_stats.items():
-    print(f"{model}: {data['calls']} llamadas, ${data['avg_cost']:.6f} promedio")
 ```
 
-**Herramienta de comparación:** `compare_prompts.py`
-
-```bash
-python compare_prompts.py
-```
-
-Opciones:
-1. Comparar todos los prompts
-2. Ver estadísticas detalladas de un prompt
-3. Comparar prompts por modelo específico
-
-**Ejemplo completo:** `examples/prompt_tracking_example.py`
-
----
-
-### 🔹 Sistema de Evaluación de Prompts (Evals)
-
-Evalúa y mejora tus prompts automáticamente usando golden examples:
-
-#### 1. Crear Prompt y Golden Examples
+### 🔹 Sistema de Evaluación de Prompts
 
 ```python
 from prompt import Prompt
 from eval_database import get_eval_db
+from prompt_evaluator import PromptEvaluator
 
-# Crear prompt
+# 1. Crear prompt
 comedian = Prompt()
-comedian.set_system(
-    "Sos un comediante argentino. Generás chistes inteligentes "
-    "con humor observacional sobre la vida cotidiana."
-)
+comedian.set_system("Sos un comediante argentino...")
 comedian.save()
 
-# Agregar golden examples (test cases)
+# 2. Agregar golden examples
 db = get_eval_db()
 db.add_test_case(
     prompt_id=comedian.get_id(),
     input="Hacé un chiste sobre el subte",
-    expected_output="El subte es el único lugar donde 'no hay lugar' "
-                   "significa que hay 47 personas en un vagón para 20...",
-    category="transporte",
-    notes="Humor observacional sobre transporte público"
+    expected_output="El subte es el único lugar...",
+    category="transporte"
 )
-```
 
-#### 2. Ejecutar Evaluación
-
-```python
-from prompt_evaluator import PromptEvaluator
-
-# Crear evaluador
-eval_client = create_client('gemini')
-evaluator = PromptEvaluator(eval_client, evaluator_model='gemini-2.0-flash-exp')
-
-# Obtener test cases
+# 3. Ejecutar evaluación
+evaluator = PromptEvaluator(eval_client)
 test_cases = db.get_test_cases(comedian.get_id())
-test_cases_dict = [tc.to_dict() for tc in test_cases]
+results = evaluator.batch_evaluate(comedian, test_cases, test_client)
 
-# Evaluar
-test_client = create_client('gemini')
-results = evaluator.batch_evaluate(
-    comedian,
-    test_cases_dict,
-    test_client
-)
-
-# Ver reporte
+# 4. Ver reporte
 report = evaluator.generate_report(results)
 print(f"Score promedio: {report['avg_score']:.2f}")
-print(f"Aprobados: {report['passed']}/{report['total']}")
 ```
-
-#### 3. Agregar Feedback Humano
-
-```python
-# Actualizar con feedback humano
-db.update_evaluation_human_feedback(
-    eval_id=1,
-    human_score=0.8,
-    human_feedback="Buen chiste pero le falta más acidez"
-)
-```
-
-#### 4. Mejorar Prompt Automáticamente
-
-```python
-from prompt_evaluator import PromptImprover
-
-# Crear improver
-improve_client = create_client('gemini')
-improver = PromptImprover(improve_client, improver_model='gemini-2.0-flash-exp')
-
-# Analizar fallas
-failures = improver.analyze_failures(results, threshold=0.7)
-
-# Generar mejoras
-improvements = improver.generate_improvements(comedian, failures)
-
-# Crear nueva versión
-improved = improver.create_improved_version(comedian, improvements, version=2)
-improved.save()
-
-# Guardar versión
-db.save_prompt_version(
-    parent_prompt_id=comedian.get_id(),
-    version=2,
-    system_message=improvements['system_message'],
-    few_shot_examples=[...],
-    improvement_reason=improvements['explanation']
-)
-```
-
-**Características del Sistema de Evaluación:**
-- ✅ Golden examples como test cases
-- ✅ Evaluación automática con LLM (structured output)
-- ✅ Feedback humano opcional
-- ✅ Mejora automática basada en fallas
-- ✅ Versionado de prompts
-- ✅ Tracking de evolución del prompt
-
-**Ejemplo completo:** `examples/comedian_eval_example.py`
-
-**Mejora con feedback:** `examples/test_improvement.py`
-
----
-
-### 🔹 Few-Shot Learning
-
-Enseña comportamientos específicos con ejemplos:
-
-```python
-prompt = Prompt()
-prompt.set_system("Eres un traductor de jerga argentina.")
-
-# Agregar ejemplos
-prompt.add_few_shot_example(
-    "Traducí: 'Che, vamos a morfar unas empanadas'",
-    "Hey, let's go eat some empanadas"
-)
-prompt.add_few_shot_example(
-    "Traducí: 'Estoy re cansado, boludo'",
-    "I'm really tired, dude"
-)
-
-prompt.set_user_input("Traducí: 'Qué copado este lugar'")
-response, _ = client.get_response(prompt)
-```
-
----
-
-### 🔹 Templates con Variables
-
-Crea prompts reutilizables con variables:
-
-```python
-prompt = Prompt()
-prompt.set_system("Eres un generador de emails profesionales.")
-prompt.set_user_input(
-    "Escribe un email para [[recipient]] sobre [[topic]]. "
-    "El tono debe ser [[tone]]."
-)
-
-# Usar con diferentes valores
-prompt.set_variables({
-    'recipient': 'el equipo de ventas',
-    'topic': 'los resultados del Q4',
-    'tone': 'formal y motivador'
-})
-
-response, _ = client.get_response(prompt)
-```
-
----
 
 ### 🔹 LangSmith Tracing
-
-Activa tracing detallado para debugging:
 
 ```python
 # Crear cliente con tracing
@@ -454,31 +613,6 @@ Chat interactivo para testing:
 
 ---
 
-## 🧠 Workflows Agenciales (LangGraph)
-
-El framework está optimizado para grafos de estado complejos. Ver `langgraph_prueba_2.py` para un ejemplo completo de workflow de escritura:
-
-1. **Ideation**: Genera ángulos para un tema
-2. **Outline**: Estructura con secciones
-3. **Writing**: Genera contenido en paralelo
-4. **Assembler**: Une las piezas
-5. **Editor**: Refina tono y estilo
-
----
-
-## 📖 Ejemplos de Uso
-
-| Ejemplo | Descripción | Archivo |
-|---------|-------------|---------|
-| Chat básico | Sistema de chat con persistencia | `examples/chat_example.py` |
-| Prompt tracking | Tracking de uso y costos | `examples/prompt_tracking_example.py` |
-| Evaluación completa | Sistema de evals con golden examples | `examples/comedian_eval_example.py` |
-| Mejora de prompts | Mejora automática con feedback | `examples/test_improvement.py` |
-| Chat interactivo | Herramienta de testing | `interactive_chat_test.py` |
-| Comparación | Comparar prompts y costos | `compare_prompts.py` |
-
----
-
 ## 🔧 Arquitectura
 
 ### Patrón de Herencia para Tracing
@@ -497,15 +631,49 @@ El framework está optimizado para grafos de estado complejos. Ver `langgraph_pr
 
 ---
 
-## 📝 Licencia
+## 📖 Ejemplos de Uso
 
-MIT License
+| Ejemplo | Descripción | Archivo |
+|---------|-------------|---------|
+| Chat básico | Sistema de chat con persistencia | `examples/chat_example.py` |
+| Prompt tracking | Tracking de uso y costos | `examples/prompt_tracking_example.py` |
+| Evaluación completa | Sistema de evals con golden examples | `examples/comedian_eval_example.py` |
+| Mejora de prompts | Mejora automática con feedback | `examples/test_improvement.py` |
+| Chat interactivo | Herramienta de testing | `interactive_chat_test.py` |
+| Comparación | Comparar prompts y costos | `compare_prompts.py` |
 
 ---
 
 ## 🚀 Roadmap
 
+### Framework Core
+- [ ] Soporte para más providers (Cohere, AI21, etc.)
+- [ ] Streaming de respuestas
+- [ ] Batch processing optimizado
+- [ ] Cache distribuido con Redis
+
+### Agentes
+- [ ] Multi-agent orchestration
+- [ ] Herramientas de búsqueda web integradas
+- [ ] Soporte para código ejecutable
+- [ ] Integración con bases de datos
+
+### RAG
+- [ ] Hybrid search (keyword + semantic)
+- [ ] Multi-modal RAG (imágenes, videos)
+- [ ] Adaptive retrieval strategies
+- [ ] Query routing automático
+
+### MCP
+- [ ] Más servidores MCP (Jira, Linear, Slack, etc.)
+- [ ] Auto-discovery de servidores
+- [ ] Dashboard de monitoreo
+- [ ] Versioning de herramientas
+
+### Evaluación
+- [ ] Más métricas de evaluación
+- [ ] A/B testing de prompts
+- [ ] Regression testing automático
+- [ ] Benchmark suite completo
 
 ---
-
-*Desarrollado para el futuro de la IA Agencial*

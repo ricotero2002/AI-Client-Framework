@@ -697,42 +697,6 @@ CMD ["nemoguardrails", "server", "--config", "/app/config"]
 
 ---
 
-## 📚 Referencias
-
-### Documentación Oficial
-- [NVIDIA NeMo Guardrails Docs](https://docs.nvidia.com/nemo/guardrails/)
-- [NVIDIA NIM API Catalog](https://build.nvidia.com/)
-- [Garak Documentation](https://garak.ai/)
-- [GLiNER GitHub](https://github.com/urchade/GLiNER)
-
-### Papers y Research
-- [PromptInject: Adversarial Prompt Attacks](https://arxiv.org/abs/2302.12173)
-- [Jailbroken: How Does LLM Safety Training Fail?](https://arxiv.org/abs/2307.02483)
-- [Red Teaming Language Models](https://arxiv.org/abs/2202.03286)
-
-### Herramientas Relacionadas
-- [PyRIT - Python Risk Identification Toolkit](https://github.com/Azure/PyRIT)
-- [LangSmith - LLM Observability](https://www.langchain.com/langsmith)
-- [OWASP LLM Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
-
-### Comunidad
-- [NVIDIA Developer Forums](https://forums.developer.nvidia.com/)
-- [NeMo Guardrails GitHub Issues](https://github.com/NVIDIA/NeMo-Guardrails/issues)
-- [Garak Discord](https://discord.gg/garak)
-
----
-
-## 📝 Notas Adicionales
-
-### Consideraciones de Costos
-
-**NVIDIA NIM API:**
-- Llama 3.3 70B: ~$0.001 por 1K tokens
-- Nemotron Safety Guard: ~$0.0005 por 1K tokens
-- NeMo Guard Jailbreak: ~$0.0003 por request
-
-**Estimación mensual (1000 requests/día):**
-- ~$30-50 USD dependiendo de longitud de prompts
 
 ### Limitaciones Conocidas
 
@@ -740,15 +704,6 @@ CMD ["nemoguardrails", "server", "--config", "/app/config"]
 2. **Falsos Positivos:** ~2-3% en detección de jailbreaks (según testing interno)
 3. **Idioma:** Optimizado para español, menor precisión en otros idiomas
 4. **PII:** GLiNER puede no detectar formatos no estándar de datos sensibles
-
-### Contribuciones
-
-Para contribuir al proyecto:
-1. Fork el repositorio
-2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -m 'Agrega nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abre un Pull Request
 
 ### Licencia
 
