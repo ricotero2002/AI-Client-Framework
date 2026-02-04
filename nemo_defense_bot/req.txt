@@ -1,0 +1,11 @@
+nemoguardrails>=0.14.1
+garak
+pyrit
+guardrails-ai
+presidio-analyzer
+presidio-anonymizer
+langchain-llm 
+langchain-community
+nemoguardrails[nvidia]
+langchain-nvidia-ai-endpoints
+yara-python

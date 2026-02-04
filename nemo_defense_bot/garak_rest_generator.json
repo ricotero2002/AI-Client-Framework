@@ -1,0 +1,24 @@
+{
+  "rest": {
+    "RestGenerator": {
+      "name": "nemo_guardrails_local",
+      "uri": "http://localhost:8000/v1/chat/completions",
+      "method": "post",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "req_template_json_object": {
+        "model": "nemo",
+        "messages": [
+          {
+            "role": "user",
+            "content": "$INPUT"
+          }
+        ]
+      },
+      "response_json": true,
+      "response_json_field": "$.messages[0].content",
+      "request_timeout": 60
+    }
+  }
+}

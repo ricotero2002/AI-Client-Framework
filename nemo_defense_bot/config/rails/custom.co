@@ -1,0 +1,20 @@
+# Definimos el mensaje de rechazo específico
+define bot refuse bee movie
+  "No hablo de esa película."
+
+# Flujo para enmascarar el código interno
+define flow mask internal code pattern
+  # Ejecutamos la acción de Python y guardamos el resultado
+  $masked_text = execute mask_internal_code
+  
+  # IMPORTANTE: Sobrescribimos la variable del mensaje del usuario
+  # para que el resto del sistema (y el LLM) vea el texto censurado.
+  $user_message = $masked_text
+
+# Flujo para bloquear Bee Movie
+define flow check bee movie
+  $is_blocked = execute check_bee_movie_topic
+  
+  if $is_blocked
+    bot refuse bee movie
+    stop
