@@ -30,14 +30,11 @@ class Settings(BaseSettings):
     kafka_topic_processed: str = "datos_procesados"
     kafka_consumer_group: str = "ai_eventstream_consumers"
     
-    # OpenAI Configuration
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
-    openai_embedding_model: str = "text-embedding-3-small"
+    embedding_model: str = "gemini-embedding-001"  # Replaced as requested
     
     # Gemini Configuration (opcional)
     google_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash-exp"
+    gemini_model: str = "gemini-2.5-flash-lite"
     
     # Celery Configuration
     celery_broker_url: str = "redis://localhost:6379/1"
@@ -54,9 +51,9 @@ class Settings(BaseSettings):
     worker_concurrency: int = 4
     
     # Semantic Cache Configuration
-    semantic_similarity_threshold: float = 0.85
+    semantic_similarity_threshold: float = 0.7
     cache_ttl: int = 3600
-    vector_dimension: int = 1536
+    vector_dimension: int = 3072
     
     # API Configuration
     api_host: str = "0.0.0.0"

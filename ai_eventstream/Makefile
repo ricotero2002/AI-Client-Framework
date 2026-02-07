@@ -43,7 +43,7 @@ logs-kafka: ## Muestra logs del consumidor de Kafka
 	$(DOCKER_COMPOSE) logs -f kafka_consumer
 
 test: ## Ejecuta los tests
-	$(PYTHON) -m pytest test_system.py -v --cov=. --cov-report=html
+	$(PYTHON) -m pytest test_system.py -v --cov=. --cov-report=html --html=reporte_errores.html
 
 verify: ## Verifica el estado del sistema
 	$(PYTHON) verify_system.py

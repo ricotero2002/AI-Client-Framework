@@ -100,7 +100,9 @@ FROM base as flower
 
 # Copiar solo lo necesario para Flower
 COPY config.py .
+COPY redis_client.py .
 COPY celery_app.py .
+COPY celery_tasks.py .
 
 # Exponer puerto
 EXPOSE 5555

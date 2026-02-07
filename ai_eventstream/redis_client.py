@@ -13,7 +13,7 @@ from redisvl.index import SearchIndex
 from redisvl.query import VectorQuery
 from redisvl.query.filter import Tag
 from loguru import logger
-
+import hashlib
 from config import settings
 
 
@@ -123,6 +123,7 @@ class SemanticCache:
             results = await asyncio.to_thread(self.index.query, query)
             
             if not results:
+                print("No se encontraron resultados similares en caché")
                 logger.debug("No se encontraron resultados similares en caché")
                 return None
             
@@ -173,10 +174,13 @@ class SemanticCache:
         Returns:
             True si se almacenó exitosamente, False en caso contrario
         """
+
+
         try:
-            # Generar ID único
-            cache_key = f"cache:{hash(query)}:{task_type}"
-            
+
+            # Generar hash estable (SHA256)
+            query_hash = hashlib.sha256(query.encode('utf-8')).hexdigest()
+            cache_key = f"cache:{query_hash}:{task_type}"            
             # Preparar datos
             data = {
                 "query": query,

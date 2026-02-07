@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 from loguru import logger
 
@@ -76,9 +76,14 @@ async def startup_event():
     """Inicializar conexiones al arrancar."""
     logger.info("🚀 Iniciando AI-EventStream API...")
     
-    # Conectar a Redis
+    # Conectar to Redis
     redis = await get_redis_client()
     await redis.connect()
+    
+    # Establecer tiempo de inicio si no existe
+    existing_start = await redis.get("metrics:system_start_time")
+    if not existing_start:
+        await redis.set("metrics:system_start_time", datetime.utcnow().isoformat())
     
     logger.info("✅ API lista para recibir requests")
 
@@ -146,6 +151,9 @@ async def process_text(
             },
             task_id=task_id
         )
+        
+        # [NUEVO] Incrementar contador de tareas totales
+        await redis.redis.incr("metrics:total_tasks")
         
         # Guardar metadata en Redis
         await redis.set_json(
@@ -225,24 +233,65 @@ async def get_metrics(redis: AsyncRedisClient = Depends(get_redis_client)):
     Retorna métricas del sistema.
     """
     try:
-        # Obtener estadísticas de Celery
+        # 1. Obtener contadores atómicos de Redis
+        # Usamos mget para eficiencia (menos round-trips)
+        keys = [
+            "metrics:total_tasks",
+            "metrics:completed_tasks",
+            "metrics:failed_tasks",
+            "metrics:cache_hits",
+            "metrics:cache_misses",
+            "metrics:total_processing_time",
+            "metrics:system_start_time"
+        ]
+        values = await redis.redis.mget(keys)
+        
+        # Parsear valores (Redis devuelve strings o None)
+        total_tasks = int(values[0] or 0)
+        completed_tasks = int(values[1] or 0)
+        failed_tasks = int(values[2] or 0)
+        cache_hits = int(values[3] or 0)
+        cache_misses = int(values[4] or 0)
+        total_proc_time = float(values[5] or 0.0)
+        start_time_str = values[6]
+        
+        # 2. Obtener tareas activas en tiempo real desde Celery
         inspect = celery_app.control.inspect()
-        
-        stats = inspect.stats()
         active = inspect.active()
+        active_tasks_count = sum(len(tasks) for tasks in active.values()) if active else 0
         
-        total_workers = len(stats) if stats else 0
-        active_tasks = sum(len(tasks) for tasks in active.values()) if active else 0
+        # 3. Calcular Métricas Derivadas
         
-        # Métricas básicas (pueden expandirse)
+        # Hit Rate
+        total_cache_ops = cache_hits + cache_misses
+        hit_rate = (cache_hits / total_cache_ops * 100) if total_cache_ops > 0 else 0.0
+        
+        # Tiempo promedio
+        avg_time = (total_proc_time / completed_tasks) if completed_tasks > 0 else 0.0
+        
+        # Uptime
+        uptime_str = "N/A"
+        if start_time_str:
+            try:
+                # Decodificar bytes si es necesario
+                if isinstance(start_time_str, bytes):
+                    start_time_str = start_time_str.decode('utf-8')
+                    
+                start_dt = datetime.fromisoformat(start_time_str)
+                delta = datetime.utcnow() - start_dt
+                # Formato amigable: "2 days, 4:30:00"
+                uptime_str = str(delta).split('.')[0] 
+            except Exception:
+                pass
+
         return MetricsResponse(
-            total_tasks=0,  # Implementar contador en Redis
-            active_tasks=active_tasks,
-            completed_tasks=0,  # Implementar contador en Redis
-            failed_tasks=0,  # Implementar contador en Redis
-            cache_hit_rate=0.0,  # Implementar tracking en Redis
-            avg_processing_time=0.0,  # Implementar tracking en Redis
-            uptime="N/A"  # Implementar tracking
+            total_tasks=total_tasks,
+            active_tasks=active_tasks_count,
+            completed_tasks=completed_tasks,
+            failed_tasks=failed_tasks,
+            cache_hit_rate=round(hit_rate, 2),
+            avg_processing_time=round(avg_time, 4),
+            uptime=uptime_str
         )
         
     except Exception as e:
