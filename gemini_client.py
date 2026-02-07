@@ -363,7 +363,67 @@ class GeminiClient(BaseAIClient):
         if not pricing:
             return False
         
-        # Gemini 1.5 Pro and Flash support context caching
         return pricing.get('cached_input') is not None
     
+    def get_embeddings(
+        self,
+        texts: List[str],
+        model: Optional[str] = None,
+        task_type: Optional[str] = None,
+        output_dimensionality: Optional[int] = None
+    ) -> List[List[float]]:
+        """
+        Generate embeddings using Gemini embedding model
+        
+        Args:
+            texts: List of text strings to embed
+            model: Embedding model to use (default: 'gemini-embedding-001')
+            task_type: Task type for optimization. Supported values:
+                - 'SEMANTIC_SIMILARITY': For similarity comparisons
+                - 'CLASSIFICATION': For text classification
+                - 'CLUSTERING': For grouping similar texts
+                - 'RETRIEVAL_DOCUMENT': For indexing documents
+                - 'RETRIEVAL_QUERY': For search queries
+                - 'CODE_RETRIEVAL_QUERY': For code search
+                - 'QUESTION_ANSWERING': For Q&A systems
+                - 'FACT_VERIFICATION': For fact-checking
+            output_dimensionality: Embedding dimension (128-3072, recommended: 768, 1536, 3072)
+        
+        Returns:
+            List of embedding vectors
+        """
+        try:
+            from google.genai import types
+            
+            # Use default embedding model if not specified
+            embedding_model = model or "gemini-embedding-001"
+            
+            # Prepare config
+            config_params = {}
+            
+            # Add task type if specified
+            if task_type:
+                config_params['task_type'] = task_type
+            
+            # Add output dimensionality if specified
+            if output_dimensionality:
+                config_params['output_dimensionality'] = output_dimensionality
+            
+            # Create config if we have parameters
+            config = types.EmbedContentConfig(**config_params) if config_params else None
+            
+            # Generate embeddings
+            result = self._client.models.embed_content(
+                model=embedding_model,
+                contents=texts,
+                config=config
+            )
+            
+            # Extract embedding vectors
+            embeddings = [embedding.values for embedding in result.embeddings]
+            
+            return embeddings
+            
+        except Exception as e:
+            raise Exception(f"Gemini embeddings error: {str(e)}")
 

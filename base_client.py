@@ -297,3 +297,16 @@ class BaseAIClient(ABC):
             # Add overhead for message structure (role, formatting, etc.)
             total += 4  # Approximate overhead per message
         return total
+    
+    def count_embedding_tokens(self, texts: List[str], model: Optional[str] = None) -> int:
+        """
+        Count total tokens for embedding generation
+        
+        Args:
+            texts: List of texts to embed
+            model: Model to use for counting
+        
+        Returns:
+            Total number of tokens across all texts
+        """
+        return sum(self.count_tokens(text, model) for text in texts)

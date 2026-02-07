@@ -184,4 +184,32 @@ class OpenAIClient(BaseAIClient):
         
         return pricing.get('cached_input') is not None
     
+    def get_embeddings(
+        self,
+        texts: List[str],
+        model: Optional[str] = None,
+        task_type: Optional[str] = None,
+        output_dimensionality: Optional[int] = None
+    ) -> List[List[float]]:
+        """
+        Generate embeddings using OpenAI
+        """
+        try:
+            model_name = model or "text-embedding-3-small"
+            
+            # OpenAI doesn't support task_type in the same way, but supports dimensions
+            kwargs = {}
+            if output_dimensionality:
+                kwargs['dimensions'] = output_dimensionality
+                
+            response = self._client.embeddings.create(
+                input=texts,
+                model=model_name,
+                **kwargs
+            )
+            
+            return [data.embedding for data in response.data]
+            
+        except Exception as e:
+            raise Exception(f"OpenAI embeddings error: {str(e)}")
 
